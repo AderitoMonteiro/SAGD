@@ -1,0 +1,126 @@
+{% load static %}<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SAGD{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cycle-create.css' %}">
+  <link rel="stylesheet" href="{% static 'css/workflow.css' %}">
+  <link rel="stylesheet" href="{% static 'css/ca.css' %}">
+  <link rel="stylesheet" href="{% static 'css/planning.css' %}">
+  <link rel="stylesheet" href="{% static 'css/menu-cycle.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cycle-management.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cycle-modals.css' %}">
+  <link rel="stylesheet" href="{% static 'css/spa-layout.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cycle-status.css' %}">
+  <link rel="stylesheet" href="{% static 'css/institutional-objective.css' %}">
+  <link rel="stylesheet" href="{% static 'css/objective-readonly.css' %}">
+  <link rel="stylesheet" href="{% static 'css/sidebar-toggle.css' %}">
+  <link rel="stylesheet" href="{% static 'css/dashboard-home.css' %}">
+  <link rel="stylesheet" href="{% static 'css/dashboard-charts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/logout.css' %}">
+</head>
+<body>
+<script>
+  (function () {
+    if (localStorage.getItem('sagd-sidebar-collapsed') === 'true') document.documentElement.classList.add('sidebar-collapsed');
+  }());
+</script>
+{% block body %}{% endblock %}
+<script>
+  (function () {
+    var modalTypes = ['cycle', 'objective', 'department', 'individual'];
+
+    function allModals() {
+      return document.querySelectorAll('[data-cycle-modal], [data-objective-modal], [data-department-modal], [data-individual-modal]');
+    }
+
+    function closeModals() {
+      allModals().forEach(function (modal) {
+        modal.setAttribute('aria-hidden', 'true');
+      });
+      document.body.classList.remove('ca-modal-open');
+    }
+
+    function openModal(type, name) {
+      closeModals();
+      var modal = document.querySelector('[data-' + type + '-modal="' + name + '"]');
+      if (!modal) return;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('ca-modal-open');
+      var input = modal.querySelector('input');
+      if (input) input.focus();
+    }
+
+    function updateActiveNavigation(url) {
+      document.querySelectorAll('[data-spa-link]').forEach(function (link) {
+        link.classList.toggle('active', link.href === url);
+      });
+    }
+
+    async function loadPage(url, pushState) {
+      var response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if (!response.ok) throw new Error('Não foi possível carregar a página.');
+      var html = await response.text();
+      var documentParser = new DOMParser();
+      var nextDocument = documentParser.parseFromString(html, 'text/html');
+      var nextContent = nextDocument.querySelector('#spa-content');
+      var currentContent = document.querySelector('#spa-content');
+      if (!nextContent || !currentContent) {
+        window.location.href = url;
+        return;
+      }
+      currentContent.replaceWith(nextContent);
+      document.title = nextDocument.title;
+      updateActiveNavigation(new URL(url, window.location.href).href);
+      if (pushState) window.history.pushState({ url: url }, '', url);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.addEventListener('click', function (event) {
+      var sidebarToggle = event.target.closest('[data-sidebar-toggle]');
+      if (sidebarToggle) {
+        document.documentElement.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('sagd-sidebar-collapsed', document.documentElement.classList.contains('sidebar-collapsed'));
+        sidebarToggle.setAttribute('aria-expanded', String(!document.documentElement.classList.contains('sidebar-collapsed')));
+        return;
+      }
+      var navigationLink = event.target.closest('[data-spa-link]');
+      if (navigationLink && navigationLink.origin === window.location.origin) {
+        event.preventDefault();
+        loadPage(navigationLink.href, true).catch(function () { window.location.href = navigationLink.href; });
+        return;
+      }
+      var modalButton;
+      modalTypes.some(function (type) {
+        modalButton = event.target.closest('[data-open-' + type + '-modal]');
+        if (modalButton) {
+          openModal(type, modalButton.dataset['open' + type.charAt(0).toUpperCase() + type.slice(1) + 'Modal']);
+          return true;
+        }
+        modalButton = event.target.closest('[data-switch-' + type + '-modal]');
+        if (modalButton) {
+          openModal(type, modalButton.dataset['switch' + type.charAt(0).toUpperCase() + type.slice(1) + 'Modal']);
+          return true;
+        }
+        return false;
+      });
+      if (event.target.closest('[data-close-cycle-modal], [data-close-objective-modal], [data-close-department-modal], [data-close-individual-modal]')) closeModals();
+    });
+
+    window.addEventListener('popstate', function () {
+      loadPage(window.location.href, false).catch(function () { window.location.reload(); });
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closeModals();
+    });
+
+    document.querySelectorAll('a[href="#flow"]').forEach(function (link) {
+      link.setAttribute('href', '{% url "process_flow" %}');
+    });
+  }());
+</script>
+</body></html>

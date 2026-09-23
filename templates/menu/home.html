@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Menu | SAGD{% endblock %}
+{% block body %}
+<div class="app-shell menu-page">
+  <aside class="sidebar">
+    <div class="logo">SAGD<span>+</span></div>
+    <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Comprimir menu" aria-expanded="true"><span>‹</span></button>
+    <div class="nav-label">Menu principal</div>
+    <a class="nav-link active" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Início</span></a>
+    <div class="nav-label" style="margin-top:27px">Gestão</div>
+    <a class="nav-link" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">＋</span><span>Criar novo ciclo</span></a>
+    <a class="nav-link" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
+    <a class="nav-link" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
+    <a class="nav-link" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
+    <div class="sidebar-footer">
+      <div class="user-line">
+        <div class="avatar">{{ user.username|first|upper }}</div>
+        <div>
+          <strong>{{ user.get_full_name|default:user.username }}</strong>
+          <div class="user-role">Gestão de desempenho</div>
+        </div>
+      </div>
+      <form class="logout-form" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit">Sair da conta →</button></form>
+    </div>
+  </aside>
+
+  <div id="spa-content">
+  <main class="main menu-main">
+    <div class="topbar">
+      <div class="breadcrumb">SAGD <span>/</span> <strong>Início</strong></div>
+    </div>
+    <div class="dashboard-content">
+      <div class="dashboard-heading"><div><span class="eyebrow">PAINEL DE CONTROLO</span><h1>Gestão de desempenho</h1><p>Visão geral do planejamento e dos objetivos da organização.</p></div><a class="button primary" href="{% url 'planejamento_ciclo_create' %}" data-spa-link>Novo ciclo <span>＋</span></a></div>
+      <section class="dashboard-cycle-banner{% if not active_cycle %} dashboard-cycle-empty{% endif %}"><div><span class="eyebrow">{% if active_cycle %}CICLO EM ANDAMENTO{% else %}PRÓXIMO PASSO{% endif %}</span><h2>{% if active_cycle %}{{ active_cycle.name }} <span>{{ active_cycle.year }}</span>{% else %}Crie o primeiro ciclo{% endif %}</h2><p>{% if active_cycle %}{{ active_cycle.start_date|date:'d/m/Y' }} a {{ active_cycle.end_date|date:'d/m/Y' }} · {{ active_cycle.automatic_status_display }}{% else %}Defina o período que vai orientar os objetivos da organização.{% endif %}</p></div>{% if active_cycle %}<a class="button" href="{% url 'planejamento_ciclo_create' %}" data-spa-link>Gerir ciclos <span>→</span></a>{% else %}<a class="button" href="{% url 'planejamento_ciclo_create' %}" data-spa-link>Criar ciclo <span>→</span></a>{% endif %}</section>
+      <div class="dashboard-stats"><div class="dashboard-stat"><span class="dashboard-stat-icon">◷</span><div><strong>{{ cycles_count }}</strong><small>Ciclos registados</small></div></div><div class="dashboard-stat"><span class="dashboard-stat-icon institutional">◎</span><div><strong>{{ institutional_count }}</strong><small>Objetivos institucionais</small></div></div><div class="dashboard-stat"><span class="dashboard-stat-icon departmental">◈</span><div><strong>{{ departmental_count }}</strong><small>Objetivos departamentais</small></div></div><div class="dashboard-stat"><span class="dashboard-stat-icon individual">◇</span><div><strong>{{ individual_count }}</strong><small>Objetivos individuais</small></div></div></div>
+      <div class="dashboard-chart-grid"><section class="dashboard-panel"><div class="dashboard-panel-heading"><div><span class="eyebrow">DISTRIBUIÇÃO</span><h3>Objetivos por nível</h3></div><span class="dashboard-total">{{ level_total }} total</span></div><div class="chart-bars">{% for item in level_chart %}<div class="chart-bar-row"><div class="chart-bar-label"><span>{{ item.label }}</span><strong>{{ item.value }} · {{ item.percentage }}%</strong></div><div class="chart-bar-track"><i class="chart-bar-{{ item.color }}" style="width:{{ item.percentage }}%"></i></div></div>{% empty %}<p class="dashboard-note">Ainda não existem objetivos registados.</p>{% endfor %}</div></section><section class="dashboard-panel"><div class="dashboard-panel-heading"><div><span class="eyebrow">PROGRESSO GLOBAL</span><h3>Estado dos objetivos</h3></div><span class="dashboard-total">{{ objective_total }} total</span></div><div class="status-chart"><div class="status-donut" style="--active:{{ active_percentage }}%"><span>{{ active_percentage }}%</span></div><div class="status-legend"><div><i class="legend-active"></i><span>Em andamento</span><strong>{{ active_objectives_count }}</strong></div><div><i class="legend-completed"></i><span>Concluídos</span><strong>{{ completed_objectives_count }}</strong></div></div></div><div class="dashboard-note">Percentagens calculadas sobre todos os objetivos associados a ciclos.</div></section></div>
+      <section class="dashboard-panel dashboard-department-panel"><div class="dashboard-panel-heading"><div><span class="eyebrow">COMPARAÇÃO ORGANIZACIONAL</span><h3>Objetivos departamentais por orientação institucional</h3></div><span class="dashboard-total">{{ departmental_count }} total</span></div><div class="department-chart">{% for item in department_chart %}<div class="department-row"><div class="department-row-label"><span title="{{ item.label }}">{{ item.label|truncatechars:42 }}</span><strong>{{ item.value }} · {{ item.percentage }}%</strong></div><div class="chart-bar-track"><i style="width:{{ item.percentage }}%"></i></div></div>{% empty %}<p class="dashboard-note">Ainda não existem objetivos departamentais para comparar.</p>{% endfor %}</div><p class="dashboard-chart-caption">O sistema ainda não possui uma entidade de departamento separada; a comparação usa o objetivo institucional associado como agrupamento.</p></section>
+      <section class="dashboard-footer-card"><div><span class="eyebrow">PARTICIPAÇÃO</span><h3>{{ user_count }} utilizadores ativos</h3><p>Os objetivos individuais podem ser associados aos utilizadores disponíveis no sistema.</p></div><a class="button" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link>Ver objetivos individuais <span>→</span></a></section>
+    </div>
+  </main>
+  </div>
+</div>
+{% endblock %}

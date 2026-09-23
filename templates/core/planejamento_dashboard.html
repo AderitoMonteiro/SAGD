@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Planejamento | SAGD{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="logo">SAGD<span>+</span></div>
+    <div class="nav-label">Planejamento</div>
+    <a class="nav-link" href="{% url 'dashboard' %}"><span class="nav-icon">⌂</span><span>Visão geral</span></a>
+    <a class="nav-link active" href="{% url 'planejamento_dashboard' %}"><span class="nav-icon">◷</span><span>Ciclos</span></a>
+    <a class="nav-link" href="{% url 'process_flow' %}"><span class="nav-icon">⌁</span><span>Cronograma</span></a>
+    <div class="nav-label" style="margin-top:27px">Gestão</div>
+    <a class="nav-link" href="{% url 'planejamento_ciclo_create' %}"><span class="nav-icon">＋</span><span>Novo ciclo</span></a>
+    {% if cycles %}
+      <details class="planning-menu">
+        <summary class="nav-link"><span class="nav-icon">◎</span><span>Criar objetivo</span><span class="planning-menu-arrow">⌄</span></summary>
+        <a href="{% url 'planejamento_objetivo_institucional_create' cycles.0.id %}">Objetivo institucional</a>
+        <span class="planning-menu-disabled">Departamental após institucional</span>
+        <span class="planning-menu-disabled">Individual após departamental</span>
+      </details>
+    {% endif %}
+    <div class="sidebar-footer">
+      <div class="user-line">
+        <div class="avatar">{{ user.username|first|upper }}</div>
+        <div>
+          <strong>{{ user.get_full_name|default:user.username }}</strong>
+          <div class="user-role">{% if user.is_superuser %}Administrador{% else %}Utilizador{% endif %}</div>
+        </div>
+      </div>
+      <a class="logout" href="{% url 'logout' %}">Sair da conta →</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="breadcrumb">SAGD <span>/</span> <strong>Planejamento</strong></div>
+      <div class="top-actions">
+        <a class="button primary" href="{% url 'planejamento_ciclo_create' %}">Novo ciclo <span>＋</span></a>
+      </div>
+    </div>
+
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">MODULO DE PLANEJAMENTO</span>
+        <h1>Gestão dos ciclos estratégicos</h1>
+        <p class="heading-note">Defina, acompanhe e reorganize os objetivos institucionais, departamentais e individuais com base no ciclo em curso.</p>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Ciclos criados</div>
+        <div class="stat-number">{{ cycles|length }}</div>
+        <div class="stat-meta">Registos ativos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Último ciclo</div>
+        <div class="stat-number">{% if cycles %}{{ cycles.0.year }}{% else %}—{% endif %}</div>
+        <div class="stat-meta">Período mais recente</div>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-title">
+        <div>
+          <span class="eyebrow">LISTAGEM DOS CICLOS</span>
+          <h3>Planeamentos disponíveis</h3>
+        </div>
+        <a class="button primary" href="{% url 'planejamento_ciclo_create' %}">Criar ciclo <span>→</span></a>
+      </div>
+
+      {% if cycles %}
+        <div class="ca-cycle-list">
+          {% for cycle in cycles %}
+            <article class="ca-cycle-row">
+              <div class="ca-cycle-mark">{{ cycle.year|stringformat:'s'|slice:'-2:' }}</div>
+              <div class="ca-cycle-info">
+                <h4>{{ cycle.name }} <span>{{ cycle.year }}</span></h4>
+                <p>{{ cycle.start_date|date:'d/m/Y' }} a {{ cycle.end_date|date:'d/m/Y' }}</p>
+              </div>
+              <span class="cycle-status ca-status-{{ cycle.status }}">● {{ cycle.get_status_display }}</span>
+              <div class="ca-cycle-detail-actions">
+                <a class="button" href="{% url 'planejamento_ciclo_detail' cycle.id %}">Abrir</a>
+                <a class="button" href="{% url 'planejamento_ciclo_edit' cycle.id %}">Editar</a>
+                <form method="post" action="{% url 'planejamento_ciclo_delete' cycle.id %}" onsubmit="return confirm('Eliminar este ciclo?');">
+                  {% csrf_token %}
+                  <button class="button ca-delete-button" type="submit">Eliminar</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="ca-empty-state ca-empty-compact">
+          <div class="ca-empty-orbit">CA</div>
+          <span class="eyebrow">PRIMEIRO REGISTRO</span>
+          <h2>Nenhum ciclo criado ainda</h2>
+          <p>Inicie a estrutura do planejamento definindo um novo ciclo para organizar os objetivos da organização.</p>
+          <a class="button primary" href="{% url 'planejamento_ciclo_create' %}">Criar novo ciclo <span>→</span></a>
+        </div>
+      {% endif %}
+    </section>
+  </main>
+</div>
+{% endblock %}

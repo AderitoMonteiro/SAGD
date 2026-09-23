@@ -1,0 +1,41 @@
+from django.contrib.auth import views as auth_views
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('', views.menu_home, name='menu_home'),
+    path('painel/', views.dashboard, name='dashboard'),
+    path('fluxo/', views.process_flow, name='process_flow'),
+    path('planejamento/', views.planejamento_dashboard, name='planejamento_dashboard'),
+    path('planejamento/ciclos/novo/', views.planejamento_ciclo_create, name='planejamento_ciclo_create'),
+    path('planejamento/ciclos/<int:cycle_id>/', views.planejamento_ciclo_detail, name='planejamento_ciclo_detail'),
+    path('planejamento/ciclos/<int:cycle_id>/editar/', views.planejamento_ciclo_edit, name='planejamento_ciclo_edit'),
+    path('planejamento/ciclos/<int:cycle_id>/excluir/', views.planejamento_ciclo_delete, name='planejamento_ciclo_delete'),
+    path('planejamento/objetivos-institucionais/', views.planejamento_objetivo_institucional_menu, name='planejamento_objetivo_institucional_menu'),
+    path('planejamento/objetivos-departamentais/', views.planejamento_objetivo_departamental_menu, name='planejamento_objetivo_departamental_menu'),
+    path('planejamento/objetivos-individuais/', views.planejamento_objetivo_individual_menu, name='planejamento_objetivo_individual_menu'),
+    path('planejamento/ciclos/<int:cycle_id>/objetivos-institucionais/novo/', views.planejamento_objetivo_institucional_create, name='planejamento_objetivo_institucional_create'),
+    path('planejamento/objetivos-institucionais/<int:objetivo_id>/editar/', views.planejamento_objetivo_institucional_edit, name='planejamento_objetivo_institucional_edit'),
+    path('planejamento/objetivos-institucionais/<int:objetivo_id>/excluir/', views.planejamento_objetivo_institucional_delete, name='planejamento_objetivo_institucional_delete'),
+    path('planejamento/objetivos-institucionais/<int:objetivo_id>/departamentais/novo/', views.planejamento_objetivo_departamental_create, name='planejamento_objetivo_departamental_create'),
+    path('planejamento/objetivos-departamentais/<int:objetivo_id>/editar/', views.planejamento_objetivo_departamental_edit, name='planejamento_objetivo_departamental_edit'),
+    path('planejamento/objetivos-departamentais/<int:objetivo_id>/excluir/', views.planejamento_objetivo_departamental_delete, name='planejamento_objetivo_departamental_delete'),
+    path('planejamento/objetivos-departamentais/<int:objetivo_id>/individuais/novo/', views.planejamento_objetivo_individual_create, name='planejamento_objetivo_individual_create'),
+    path('planejamento/objetivos-individuais/<int:objetivo_id>/editar/', views.planejamento_objetivo_individual_edit, name='planejamento_objetivo_individual_edit'),
+    path('planejamento/objetivos-individuais/<int:objetivo_id>/excluir/', views.planejamento_objetivo_individual_delete, name='planejamento_objetivo_individual_delete'),
+    path('ciclos/novo/', views.cycle_create, name='cycle_create'),
+    path('ciclos/<int:cycle_id>/editar/', views.cycle_edit, name='cycle_edit'),
+    path('ciclos/<int:cycle_id>/excluir/', views.cycle_delete, name='cycle_delete'),
+    path('ciclos/<int:cycle_id>/', views.cycle_detail, name='cycle_detail'),
+    path('ciclos/<int:cycle_id>/avaliacoes/nova/', views.evaluation_create, name='evaluation_create'),
+    path('ciclos/<int:cycle_id>/objetivos/novo/', views.objective_create, name='objective_create'),
+    path('ciclos/<int:cycle_id>/acompanhamentos/novo/', views.follow_up_create, name='follow_up_create'),
+    path('ciclos/<int:cycle_id>/validacoes/nova/', views.validation_create, name='validation_create'),
+    path('avaliacoes/<int:evaluation_id>/', views.evaluation_detail, name='evaluation_detail'),
+    path('avaliacoes/<int:evaluation_id>/editar/', views.evaluation_edit, name='evaluation_edit'),
+    path('avaliacoes/<int:evaluation_id>/excluir/', views.evaluation_delete, name='evaluation_delete'),
+    path('validacoes/<int:validation_id>/atualizar/', views.validation_update, name='validation_update'),
+]

@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}{{ cycle.name }} | SAGD{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="logo">SAGD<span>+</span></div>
+    <div class="nav-label">Planejamento</div>
+    <a class="nav-link" href="{% url 'dashboard' %}"><span class="nav-icon">⌂</span><span>Visão geral</span></a>
+    <a class="nav-link active" href="{% url 'planejamento_dashboard' %}"><span class="nav-icon">◷</span><span>Ciclos</span></a>
+    <a class="nav-link" href="{% url 'process_flow' %}"><span class="nav-icon">⌁</span><span>Cronograma</span></a>
+    <div class="nav-label" style="margin-top:27px">Gestão</div>
+    <a class="nav-link" href="{% url 'planejamento_ciclo_create' %}"><span class="nav-icon">＋</span><span>Novo ciclo</span></a>
+    <details class="planning-menu" open>
+      <summary class="nav-link"><span class="nav-icon">◎</span><span>Criar objetivo</span><span class="planning-menu-arrow">⌄</span></summary>
+      <a href="{% url 'planejamento_objetivo_institucional_create' cycle.id %}">Objetivo institucional</a>
+      {% for objetivo in institucionais %}
+        <span class="planning-menu-parent">{{ objetivo.description|truncatechars:26 }}</span>
+        <a href="{% url 'planejamento_objetivo_departamental_create' objetivo.id %}">↳ Departamental</a>
+        {% for departamental in objetivo.department_objectives.all %}
+          <span class="planning-menu-parent">{{ departamental.description|truncatechars:22 }}</span>
+          <a href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">↳ Individual</a>
+        {% endfor %}
+      {% endfor %}
+    </details>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="breadcrumb">SAGD <span>/</span> <strong>{{ cycle.name }} {{ cycle.year }}</strong></div>
+      <div class="top-actions">
+        <a class="button" href="{% url 'planejamento_ciclo_edit' cycle.id %}">Editar</a>
+        <form method="post" action="{% url 'planejamento_ciclo_delete' cycle.id %}" onsubmit="return confirm('Eliminar este ciclo?');">
+          {% csrf_token %}
+          <button class="button ca-delete-button" type="submit">Eliminar</button>
+        </form>
+      </div>
+    </div>
+
+    <section class="ca-cycle-strip">
+      <div>
+        <span class="eyebrow">CICLO EM PLANEJAMENTO</span>
+        <h2>{{ cycle.name }} <span>{{ cycle.year }}</span></h2>
+        <p>{{ cycle.start_date|date:'d/m/Y' }} a {{ cycle.end_date|date:'d/m/Y' }}</p>
+      </div>
+      <span class="cycle-status ca-status-{{ cycle.status }}">● {{ cycle.get_status_display }}</span>
+    </section>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Objetivos institucionais</div>
+        <div class="stat-number">{{ institucionais|length }}</div>
+        <div class="stat-meta">Total de objetivos</div>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-title">
+        <div>
+          <span class="eyebrow">HIERARQUIA ESTRATÉGICA</span>
+          <h3>Objetivos do ciclo</h3>
+        </div>
+        <a class="button primary" href="{% url 'planejamento_objetivo_institucional_create' cycle.id %}">Adicionar objetivo institucional <span>＋</span></a>
+      </div>
+
+      {% for objetivo in institucionais %}
+        <article class="panel" style="padding: 18px; margin-top: 16px; background: #f7f9fc; border: 1px solid #e3e8f1;">
+          <div class="panel-title">
+            <div>
+              <span class="eyebrow">OBJETIVO INSTITUCIONAL</span>
+              <h4>{{ objetivo.description }}</h4>
+            </div>
+            <div class="ca-cycle-detail-actions">
+              <a class="button" href="{% url 'planejamento_objetivo_institucional_edit' objetivo.id %}">Editar</a>
+              <form method="post" action="{% url 'planejamento_objetivo_institucional_delete' objetivo.id %}" onsubmit="return confirm('Eliminar este objetivo institucional?');">
+                {% csrf_token %}
+                <button class="button ca-delete-button" type="submit">Eliminar</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="panel-title" style="margin-top: 18px;">
+            <div>
+              <span class="eyebrow">DEPARTAMENTAIS</span>
+              <h4>Objetivos departamentais</h4>
+            </div>
+            <a class="button" href="{% url 'planejamento_objetivo_departamental_create' objetivo.id %}">Adicionar departamental <span>＋</span></a>
+          </div>
+
+          {% for departamental in objetivo.department_objectives.all %}
+            <div class="panel" style="margin-top: 16px; padding: 16px; background: white; border: 1px solid #e9eef6;">
+              <div class="panel-title">
+                <div>
+                  <span class="eyebrow">OBJETIVO DEPARTAMENTAL</span>
+                  <h5>{{ departamental.description }}</h5>
+                </div>
+                <div class="ca-cycle-detail-actions">
+                  <a class="button" href="{% url 'planejamento_objetivo_departamental_edit' departamental.id %}">Editar</a>
+                  <form method="post" action="{% url 'planejamento_objetivo_departamental_delete' departamental.id %}" onsubmit="return confirm('Eliminar este objetivo departamental?');">
+                    {% csrf_token %}
+                    <button class="button ca-delete-button" type="submit">Eliminar</button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="panel-title" style="margin-top: 14px;">
+                <div>
+                  <span class="eyebrow">INDIVIDUAIS</span>
+                  <h5>Objetivos individuais</h5>
+                </div>
+                <a class="button" href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">Adicionar individual <span>＋</span></a>
+              </div>
+
+              {% for individual in departamental.individual_objectives.all %}
+                <div class="detail-block" style="margin-top: 10px;">
+                  <div class="detail-label">{{ individual.user.get_full_name|default:individual.user.username }}</div>
+                  <p>{{ individual.description }}</p>
+                  <div class="ca-cycle-detail-actions">
+                    <a class="button" href="{% url 'planejamento_objetivo_individual_edit' individual.id %}">Editar</a>
+                    <form method="post" action="{% url 'planejamento_objetivo_individual_delete' individual.id %}" onsubmit="return confirm('Eliminar este objetivo individual?');">
+                      {% csrf_token %}
+                      <button class="button ca-delete-button" type="submit">Eliminar</button>
+                    </form>
+                  </div>
+                </div>
+              {% empty %}
+                <div class="empty">Nenhum objetivo individual associado.</div>
+              {% endfor %}
+            </div>
+          {% empty %}
+            <div class="empty">Nenhum objetivo departamental associado a este objetivo institucional.</div>
+          {% endfor %}
+        </article>
+      {% empty %}
+        <div class="empty">Nenhum objetivo institucional definido para este ciclo.</div>
+      {% endfor %}
+    </section>
+  </main>
+</div>
+{% endblock %}

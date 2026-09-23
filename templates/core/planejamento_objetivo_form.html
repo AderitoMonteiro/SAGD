@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}{% if editing %}Editar objetivo{% else %}Novo objetivo{% endif %} | SAGD{% endblock %}
+{% block body %}
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="logo">SAGD<span>+</span></div>
+    <div class="nav-label">Planejamento</div>
+    <a class="nav-link" href="{% url 'dashboard' %}"><span class="nav-icon">⌂</span><span>Visão geral</span></a>
+    <a class="nav-link active" href="{% url 'planejamento_dashboard' %}"><span class="nav-icon">◷</span><span>Ciclos</span></a>
+    <a class="nav-link" href="{% url 'process_flow' %}"><span class="nav-icon">⌁</span><span>Cronograma</span></a>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="breadcrumb">SAGD <span>/</span> <strong>{% if editing %}Editar objetivo{% else %}Novo objetivo{% endif %}</strong></div>
+    </div>
+
+    <section class="panel" style="max-width: 760px; margin: 32px auto;">
+      <div class="panel-title">
+        <div>
+          <span class="eyebrow">OBJETIVO</span>
+          <h3>{% if kind == 'institucional' %}Objetivo institucional{% elif kind == 'departamental' %}Objetivo departamental{% else %}Objetivo individual{% endif %}</h3>
+        </div>
+      </div>
+
+      {% if kind == 'institucional' %}
+        <form method="post" action="{% if editing %}{% url 'planejamento_objetivo_institucional_edit' objetivo.id %}{% else %}{% url 'planejamento_objetivo_institucional_create' cycle.id %}{% endif %}">
+      {% elif kind == 'departamental' %}
+        <form method="post" action="{% if editing %}{% url 'planejamento_objetivo_departamental_edit' objetivo.id %}{% else %}{% url 'planejamento_objetivo_departamental_create' parent.id %}{% endif %}">
+      {% else %}
+        <form method="post" action="{% if editing %}{% url 'planejamento_objetivo_individual_edit' objetivo.id %}{% else %}{% url 'planejamento_objetivo_individual_create' parent.id %}{% endif %}">
+      {% endif %}
+        {% csrf_token %}
+        <div class="form-grid">
+          {% if kind == 'individual' %}
+            <label>Utilizador
+              <select name="user" required>
+                <option value="">Selecionar utilizador</option>
+                {% for user in users %}
+                  <option value="{{ user.id }}" {% if editing and user.id == objetivo.user_id %}selected{% endif %}>{{ user.get_full_name|default:user.username }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          {% endif %}
+          <label style="grid-column: 1 / -1;">Descrição
+            <textarea name="description" rows="5" required>{% if editing %}{{ objetivo.description }}{% endif %}</textarea>
+          </label>
+          <label>Status
+            <select name="status">
+              <option value="draft" {% if editing and objetivo.status == 'draft' %}selected{% endif %}>Rascunho</option>
+              <option value="active" {% if editing and objetivo.status == 'active' %}selected{% endif %}>Em andamento</option>
+              <option value="completed" {% if editing and objetivo.status == 'completed' %}selected{% endif %}>Concluído</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-actions">
+          <a class="button" href="{% url 'planejamento_ciclo_detail' cycle.id %}">Cancelar</a>
+          <button class="button primary" type="submit">{% if editing %}Guardar{% else %}Criar objetivo{% endif %}</button>
+        </div>
+      </form>
+    </section>
+  </main>
+</div>
+{% endblock %}
