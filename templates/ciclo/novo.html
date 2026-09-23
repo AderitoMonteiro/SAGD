@@ -39,9 +39,6 @@
           </div>
           <button class="button primary" type="button" data-open-cycle-modal="create">Novo ciclo <span>＋</span></button>
         </div>
-        {% if messages %}
-          {% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}
-        {% endif %}
         {% if cycles %}
           <div class="cycle-record-list">
             {% for item in cycles %}

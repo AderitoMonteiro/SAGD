@@ -28,7 +28,6 @@
             <div><span class="eyebrow">PLANEJAMENTO ESTRATÉGICO</span><h1>Objetivos institucionais</h1><p>Defina os objetivos que orientam toda a organização.</p></div>
             <button class="button primary" type="button" data-open-objective-modal="create">Novo objetivo <span>＋</span></button>
           </div>
-          {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
           {% if objetivos %}
             <div class="objective-record-list">
               {% for objetivo in objetivos %}

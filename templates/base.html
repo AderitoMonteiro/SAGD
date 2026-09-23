@@ -21,6 +21,8 @@
   <link rel="stylesheet" href="{% static 'css/dashboard-home.css' %}">
   <link rel="stylesheet" href="{% static 'css/dashboard-charts.css' %}">
   <link rel="stylesheet" href="{% static 'css/logout.css' %}">
+  <link rel="stylesheet" href="{% static 'css/navigation-loader.css' %}">
+  <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
 </head>
 <body>
 <script>
@@ -29,9 +31,49 @@
   }());
 </script>
 {% block body %}{% endblock %}
+{% if messages %}
+  <div class="toast-stack" aria-live="polite" aria-atomic="true">
+    {% for message in messages %}
+      <div class="toast toast-{{ message.tags|default:'info' }}" data-toast>
+        <span class="toast-icon" aria-hidden="true">{% if message.tags == 'success' %}✓{% elif message.tags == 'error' %}!{% else %}i{% endif %}</span>
+        <span class="toast-message">{{ message }}</span>
+        <button class="toast-close" type="button" data-close-toast aria-label="Fechar mensagem">×</button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+<div class="navigation-loader" data-navigation-loader aria-hidden="true"><div class="navigation-loader-card" role="status" aria-live="polite"><div class="navigation-loader-spinner"></div><strong>A carregar o módulo</strong><span>A preparar o conteúdo solicitado...</span><div class="navigation-loader-progress"><i></i></div></div></div>
 <script>
   (function () {
     var modalTypes = ['cycle', 'objective', 'department', 'individual'];
+    var navigationLoader = document.querySelector('[data-navigation-loader]');
+    // Mantém o carregador visível o bastante para tornar a troca do conteúdo central perceptível.
+    var minimumNavigationLoaderTime = 550;
+
+    function wait(milliseconds) {
+      return new Promise(function (resolve) { window.setTimeout(resolve, milliseconds); });
+    }
+
+    function showNavigationLoader() {
+      if (!navigationLoader) return;
+      navigationLoader.setAttribute('aria-hidden', 'false');
+      navigationLoader.classList.add('is-visible');
+    }
+
+    function hideNavigationLoader() {
+      if (!navigationLoader) return;
+      navigationLoader.setAttribute('aria-hidden', 'true');
+      navigationLoader.classList.remove('is-visible');
+    }
+
+    function dismissToast(toast) {
+      toast.classList.add('is-leaving');
+      window.setTimeout(function () { toast.remove(); }, 220);
+    }
+
+    document.querySelectorAll('[data-toast]').forEach(function (toast) {
+      window.setTimeout(function () { dismissToast(toast); }, 4500);
+    });
 
     function allModals() {
       return document.querySelectorAll('[data-cycle-modal], [data-objective-modal], [data-department-modal], [data-individual-modal]');
@@ -61,9 +103,12 @@
     }
 
     async function loadPage(url, pushState) {
-      var response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      if (!response.ok) throw new Error('Não foi possível carregar a página.');
-      var html = await response.text();
+      showNavigationLoader();
+      var loadingStartedAt = Date.now();
+      try {
+        var response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error('Não foi possível carregar a página.');
+        var html = await response.text();
       var documentParser = new DOMParser();
       var nextDocument = documentParser.parseFromString(html, 'text/html');
       var nextContent = nextDocument.querySelector('#spa-content');
@@ -72,11 +117,16 @@
         window.location.href = url;
         return;
       }
+      var remainingLoaderTime = minimumNavigationLoaderTime - (Date.now() - loadingStartedAt);
+      if (remainingLoaderTime > 0) await wait(remainingLoaderTime);
       currentContent.replaceWith(nextContent);
       document.title = nextDocument.title;
       updateActiveNavigation(new URL(url, window.location.href).href);
       if (pushState) window.history.pushState({ url: url }, '', url);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      } finally {
+        hideNavigationLoader();
+      }
     }
 
     document.addEventListener('click', function (event) {
@@ -85,6 +135,11 @@
         document.documentElement.classList.toggle('sidebar-collapsed');
         localStorage.setItem('sagd-sidebar-collapsed', document.documentElement.classList.contains('sidebar-collapsed'));
         sidebarToggle.setAttribute('aria-expanded', String(!document.documentElement.classList.contains('sidebar-collapsed')));
+        return;
+      }
+      var closeToast = event.target.closest('[data-close-toast]');
+      if (closeToast) {
+        dismissToast(closeToast.closest('[data-toast]'));
         return;
       }
       var navigationLink = event.target.closest('[data-spa-link]');
