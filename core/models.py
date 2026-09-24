@@ -142,14 +142,6 @@ class Department(models.Model):
     name = models.CharField('nome', max_length=120, unique=True)
     code = models.CharField('código', max_length=30, unique=True)
     description = models.TextField('descrição', blank=True)
-    manager = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='departments_managed',
-        verbose_name='responsável',
-    )
     is_active = models.BooleanField('ativo', default=True)
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
     date_update = models.DateTimeField('data de atualização', auto_now=True)
@@ -161,6 +153,30 @@ class Department(models.Model):
 
     def __str__(self):
         return f'{self.code} - {self.name}'
+
+
+class UserDepartment(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='department_profile',
+        verbose_name='utilizador',
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        verbose_name='departamento',
+    )
+
+    class Meta:
+        verbose_name = 'departamento do utilizador'
+        verbose_name_plural = 'departamentos dos utilizadores'
+
+    def __str__(self):
+        return f'{self.user} - {self.department or "Sem departamento"}'
 
 
 class DepartmentObjective(models.Model):

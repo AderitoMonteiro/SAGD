@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Painel do Gestor | SAGD{% endblock %}
+{% block body %}
+<div class="app-shell manager-dashboard-page">
+  {% include 'includes/management_sidebar.html' with active_menu='home' %}
+  <div id="spa-content">
+    <main class="main manager-dashboard-main">
+      <div class="topbar"><div class="breadcrumb">SAGD <span>/</span> <strong>Painel do Gestor</strong></div></div>
+      <div class="manager-dashboard-content">
+        <section class="manager-dashboard-heading">
+          <div><span class="eyebrow">ACOMPANHAMENTO OPERACIONAL</span><h1>Painel do Gestor</h1><p>Acompanhe os objetivos departamentais e individuais sob a sua gestão.</p></div>
+          <div class="manager-dashboard-actions"><a class="button primary" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link>Objetivos departamentais <span>→</span></a><a class="button" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link>Objetivos individuais <span>→</span></a></div>
+        </section>
+
+        <section class="manager-cycle-banner{% if not active_cycle %} manager-cycle-empty{% endif %}">
+          <div><span class="eyebrow">{% if active_cycle %}CICLO EM ANDAMENTO{% else %}SITUAÇÃO ATUAL{% endif %}</span><h2>{% if active_cycle %}{{ active_cycle.name }} <span>{{ active_cycle.year }}</span>{% else %}Sem ciclo em andamento{% endif %}</h2><p>{% if active_cycle %}{{ active_cycle.start_date|date:'d/m/Y' }} a {{ active_cycle.end_date|date:'d/m/Y' }}{% else %}Os objetivos continuam disponíveis para consulta e organização.{% endif %}</p></div>
+        </section>
+
+        <section class="manager-stats">
+          <article><span class="manager-stat-icon department">◈</span><div><strong>{{ department_total }}</strong><small>Objetivos departamentais</small></div></article>
+          <article><span class="manager-stat-icon individual">◇</span><div><strong>{{ individual_total }}</strong><small>Objetivos individuais</small></div></article>
+          <article><span class="manager-stat-icon active">●</span><div><strong>{{ active_department_total }}</strong><small>Departamentais em andamento</small></div></article>
+          <article><span class="manager-stat-icon active">●</span><div><strong>{{ active_individual_total }}</strong><small>Individuais em andamento</small></div></article>
+        </section>
+
+        <section class="manager-monitor-grid">
+          <article class="manager-monitor-panel"><header><div><span class="eyebrow">DEPARTAMENTAIS</span><h2>Últimos objetivos criados</h2></div><a href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link>Ver todos →</a></header><div class="manager-objective-list">{% for objective in department_objectives %}<div class="manager-objective-row"><span class="manager-row-icon">◈</span><div><strong>{{ objective.description }}</strong><small>{{ objective.institutional_objective.description|truncatechars:58 }} · {{ objective.institutional_objective.cycle.year }}</small></div><span class="objective-status objective-status-{{ objective.automatic_status }}">{{ objective.automatic_status_display }}</span></div>{% empty %}<p class="manager-empty">Ainda não existem objetivos departamentais registados.</p>{% endfor %}</div></article>
+          <article class="manager-monitor-panel"><header><div><span class="eyebrow">INDIVIDUAIS</span><h2>Últimos objetivos criados</h2></div><a href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link>Ver todos →</a></header><div class="manager-objective-list">{% for objective in individual_objectives %}<div class="manager-objective-row"><span class="manager-row-icon individual">◇</span><div><strong>{{ objective.description }}</strong><small>{{ objective.user.get_full_name|default:objective.user.username }} · {{ objective.department_objective.description|truncatechars:38 }}</small></div><span class="objective-status objective-status-{{ objective.automatic_status }}">{{ objective.automatic_status_display }}</span></div>{% empty %}<p class="manager-empty">Ainda não existem objetivos individuais registados.</p>{% endfor %}</div></article>
+        </section>
+        <section class="manager-department-panel"><header><div><span class="eyebrow">VISÃO POR DEPARTAMENTO</span><h2>Objetivos e colaboradores associados</h2></div></header><div class="manager-department-grid">{% for item in department_summaries %}<article class="manager-department-card"><div class="manager-department-title"><span>{{ item.department.code }}</span><div><h3>{{ item.department.name }}</h3><p>{{ item.collaborators|length }} colaborador{{ item.collaborators|length|pluralize:"es" }} associado{{ item.collaborators|length|pluralize:"s" }}</p></div></div><div class="manager-department-numbers"><div><strong>{{ item.department_objective_count }}</strong><small>Departamentais</small></div><div><strong>{{ item.individual_objective_count }}</strong><small>Individuais</small></div><div><strong>{{ item.collaborators|length }}</strong><small>Colaboradores</small></div></div><div class="manager-collaborators">{% for collaborator in item.collaborators %}<span>{{ collaborator.get_full_name|default:collaborator.username }}</span>{% empty %}<small>Sem colaboradores associados.</small>{% endfor %}</div></article>{% empty %}<p class="manager-empty">Ainda não existem departamentos com objetivos ou colaboradores associados.</p>{% endfor %}</div></section>
+      </div>
+    </main>
+  </div>
+</div>
+{% endblock %}

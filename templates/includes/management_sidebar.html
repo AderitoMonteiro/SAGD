@@ -1,0 +1,29 @@
+<aside class="sidebar">
+  <div class="logo">SAGD<span>+</span></div>
+  <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Comprimir menu" aria-expanded="true"><span>‹</span></button>
+  {% if is_council_user %}
+  <div class="nav-label">Conselho de Administração</div>
+  <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}"><span class="nav-icon">⌂</span><span>Painel estratégico</span></a>
+  <div class="nav-label" style="margin-top:27px">Planejamento</div>
+  <a class="nav-link{% if active_menu == 'cycles' %} active{% endif %}" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
+  <a class="nav-link{% if active_menu == 'institutional' %} active{% endif %}" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
+  <div class="nav-label" style="margin-top:27px">Consulta</div>
+  <a class="nav-link{% if active_menu == 'departmental' %} active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
+  <a class="nav-link{% if active_menu == 'individual' %} active{% endif %}" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
+  {% elif is_manager_user %}
+  <div class="nav-label">Gestor</div>
+  <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Painel estratégico</span></a>
+  <div class="nav-label" style="margin-top:27px">Objetivos</div>
+  <a class="nav-link{% if active_menu == 'departmental' %} active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Departamentais</span></a>
+  <a class="nav-link{% if active_menu == 'individual' %} active{% endif %}" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Individuais</span></a>
+  {% else %}
+  <div class="nav-label">Menu principal</div>
+  <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Início</span></a>
+  <div class="nav-label" style="margin-top:27px">Gestão</div>
+  <a class="nav-link{% if active_menu == 'cycles' %} active{% endif %}" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
+  <a class="nav-link{% if active_menu == 'institutional' %} active{% endif %}" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
+  <a class="nav-link{% if active_menu == 'departmental' %} active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
+  <a class="nav-link{% if active_menu == 'individual' %} active{% endif %}" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
+  {% endif %}
+  {% include 'includes/sidebar_account.html' with account_role='Gestão de desempenho' %}
+</aside>

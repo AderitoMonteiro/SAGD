@@ -1,0 +1,36 @@
+# Ambientes virtuais Python
+.venv/
+venv/
+env/
+ENV/
+
+# Cache e ficheiros compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django: dados locais e ficheiros gerados
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Configuração local e segredos
+.env
+.env.*
+!.env.example
+
+# Testes, cobertura e ferramentas
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editores e sistema operativo
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store

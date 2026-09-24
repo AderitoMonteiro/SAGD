@@ -2,27 +2,7 @@
 {% block title %}{% if editing %}Editar ciclo{% else %}Criar novo ciclo{% endif %} | SAGD{% endblock %}
 {% block body %}
 <div class="app-shell cycle-page">
-  <aside class="sidebar">
-    <div class="logo">SAGD<span>+</span></div>
-    <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Comprimir menu" aria-expanded="true"><span>‹</span></button>
-    <div class="nav-label">Menu principal</div>
-    <a class="nav-link" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Início</span></a>
-    <div class="nav-label" style="margin-top:27px">Gestão</div>
-    <a class="nav-link active" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
-    <div class="sidebar-footer">
-      <div class="user-line">
-        <div class="avatar">{{ user.username|first|upper }}</div>
-        <div>
-          <strong>{{ user.get_full_name|default:user.username }}</strong>
-          <div class="user-role">Gestão de desempenho</div>
-        </div>
-      </div>
-      <form class="logout-form" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit">Sair da conta →</button></form>
-    </div>
-  </aside>
+  {% include 'includes/management_sidebar.html' with active_menu='cycles' %}
 
   <div id="spa-content">
   <main class="main cycle-main">
@@ -31,13 +11,23 @@
     </div>
     <div class="cycle-content">
       <a class="cycle-back" href="{% url 'menu_home' %}">← Voltar ao início</a>
-      <section class="cycle-list-panel">
+      <section class="cycle-list-panel{% if not cycles %} cycle-list-panel-empty{% endif %}">
         <div class="cycle-section-heading">
           <div>
             <span class="eyebrow">CICLOS REGISTADOS</span>
             <h2>Ciclos existentes</h2>
+            <p class="cycle-section-note">Defina os períodos que orientam as avaliações e os objetivos da organização.</p>
           </div>
-          <button class="button primary" type="button" data-open-cycle-modal="create">Novo ciclo <span>＋</span></button>
+          <div class="cycle-heading-actions">
+            <form class="cycle-year-filter" method="get">
+              <label for="cycle-year">Ano</label>
+              <select id="cycle-year" name="year" onchange="this.form.submit()">
+                <option value="">Todos</option>
+                {% for year in years %}<option value="{{ year }}" {% if selected_year == year|stringformat:'s' %}selected{% endif %}>{{ year }}</option>{% endfor %}
+              </select>
+            </form>
+            <button class="button primary" type="button" data-open-cycle-modal="create">Novo ciclo <span>＋</span></button>
+          </div>
         </div>
         {% if cycles %}
           <div class="cycle-record-list">
@@ -58,7 +48,13 @@
             {% endfor %}
           </div>
         {% else %}
-          <p class="cycle-list-empty">Ainda não existe nenhum ciclo registado. Utilize o botão “Novo ciclo” para criar o primeiro.</p>
+          <div class="cycle-empty-state">
+            <div class="cycle-empty-symbol">◷</div>
+            <span class="eyebrow">PRIMEIRA DEFINIÇÃO</span>
+            <h2>{% if selected_year %}Nenhum ciclo encontrado{% else %}Nenhum ciclo criado{% endif %}</h2>
+            <p>{% if selected_year %}Não existem ciclos registados para o ano de {{ selected_year }}.{% else %}Crie o primeiro ciclo para iniciar o planejamento estratégico da organização.{% endif %}</p>
+            <button class="button primary" type="button" data-open-cycle-modal="create">Criar ciclo <span>＋</span></button>
+          </div>
         {% endif %}
       </section>
     </div>

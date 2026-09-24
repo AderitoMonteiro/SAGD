@@ -1,19 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Objetivos individuais | SAGD{% endblock %}
 {% block body %}
-<div class="app-shell planning-objective-page">
-  <aside class="sidebar">
-    <div class="logo">SAGD<span>+</span></div>
-    <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Comprimir menu" aria-expanded="true"><span>‹</span></button>
-    <div class="nav-label">Menu principal</div>
-    <a class="nav-link" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Início</span></a>
-    <div class="nav-label" style="margin-top:27px">Gestão</div>
-    <a class="nav-link" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
-    <a class="nav-link active" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
-    <div class="sidebar-footer"><div class="user-line"><div class="avatar">{{ user.username|first|upper }}</div><div><strong>{{ user.get_full_name|default:user.username }}</strong><div class="user-role">Gestão de desempenho</div></div></div><form class="logout-form" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit">Sair da conta →</button></form></div>
-  </aside>
+<div class="app-shell planning-objective-page{% if read_only %} is-read-only{% endif %}">
+  {% include 'includes/management_sidebar.html' with active_menu='individual' %}
 
   <div id="spa-content">
     <main class="main">
@@ -27,9 +16,20 @@
       </div>
     </main>
 
-    <div class="objective-modal" data-individual-modal="create" aria-hidden="true"><div class="objective-modal-backdrop" data-close-individual-modal></div><section class="objective-modal-card" role="dialog" aria-modal="true"><div class="objective-modal-header"><div><span class="eyebrow">DESENVOLVIMENTO INDIVIDUAL</span><h2>Novo objetivo individual</h2></div><button class="objective-modal-close" type="button" data-close-individual-modal aria-label="Fechar">×</button></div><p class="objective-modal-intro">Associe o compromisso individual a um objetivo departamental e a um utilizador.</p><form method="post" action="{% url 'planejamento_objetivo_individual_menu' %}">{% csrf_token %}<div class="form-grid"><label>Objetivo departamental<select name="department_objective" required><option value="">Selecionar objetivo departamental</option>{% for item in departamentos %}<option value="{{ item.id }}" {% if departamento_ativo and item.id == departamento_ativo.id %}selected{% endif %}>{{ item.description|truncatechars:70 }} · {{ item.institutional_objective.cycle.year }}</option>{% endfor %}</select></label><label>Utilizador<select name="user" required><option value="">Selecionar utilizador</option>{% for item in users %}<option value="{{ item.id }}">{{ item.get_full_name|default:item.username }}</option>{% endfor %}</select></label><label style="grid-column:1 / -1">Descrição<textarea name="description" rows="4" placeholder="Ex.: Implementar o novo procedimento no prazo definido" required></textarea></label></div><div class="form-actions"><button class="button" type="button" data-close-individual-modal>Cancelar</button><button class="button primary" type="submit" {% if not departamentos or not users %}disabled{% endif %}>Criar objetivo <span>→</span></button></div></form></section></div>
+    <div class="objective-modal" data-individual-modal="create" aria-hidden="true">
+      <div class="objective-modal-backdrop" data-close-individual-modal>
+
+      </div><section class="objective-modal-card" role="dialog" aria-modal="true">
+        <div class="objective-modal-header"><div><span class="eyebrow">DESENVOLVIMENTO INDIVIDUAL</span>
+          <h2>Novo objetivo individual</h2></div>
+          <button class="objective-modal-close" type="button" data-close-individual-modal aria-label="Fechar">×</button>
+        </div><p class="objective-modal-intro">Associe o compromisso individual a um objetivo departamental e a um utilizador.</p>
+            <form method="post" action="{% url 'planejamento_objetivo_individual_menu' %}">{% csrf_token %}<div class="form-grid">
+                <label>Objetivo departamental<select name="department_objective" required>
+                   <option value="">Selecionar objetivo departamental</option>{% for item in departamentos %}<option value="{{ item.id }}" {% if departamento_ativo and item.id == departamento_ativo.id %}selected{% endif %}>{{ item.description|truncatechars:70 }} · {{ item.institutional_objective.cycle.year }}</option>{% endfor %}
+                  </select></label><label>Responsavel<select name="user" required><option value="">Selecionar utilizador</option>{% for item in users %}<option value="{{ item.id }}">{{ item.get_full_name|default:item.username }}</option>{% endfor %}</select></label><label style="grid-column:1 / -1">Descrição<textarea name="description" rows="4" placeholder="Ex.: Implementar o novo procedimento no prazo definido" required></textarea></label></div><div class="form-actions"><button class="button" type="button" data-close-individual-modal>Cancelar</button><button class="button primary" type="submit" {% if not departamentos or not users %}disabled{% endif %}>Criar objetivo <span>→</span></button></div></form></section></div>
     {% for objetivo in objetivos %}
-      <div class="objective-modal" data-individual-modal="view-{{ objetivo.id }}" aria-hidden="true"><div class="objective-modal-backdrop" data-close-individual-modal></div><section class="objective-modal-card objective-view-card" role="dialog" aria-modal="true"><div class="objective-modal-header"><div><span class="eyebrow">REGISTO INDIVIDUAL</span><h2>{{ objetivo.description }}</h2></div><button class="objective-modal-close" type="button" data-close-individual-modal aria-label="Fechar">×</button></div><div class="objective-summary"><div><small>UTILIZADOR</small><strong>{{ objetivo.user.get_full_name|default:objetivo.user.username }}</strong></div><div><small>DEPARTAMENTAL</small><strong>{{ objetivo.department_objective.description|truncatechars:35 }}</strong></div><div><small>ESTADO</small><strong>{{ objetivo.automatic_status_display }}</strong></div></div><div class="form-actions"><button class="button" type="button" data-close-individual-modal>Fechar</button><button class="button primary" type="button" data-switch-individual-modal="edit-{{ objetivo.id }}">Editar objetivo</button></div></section></div>
+      <div class="objective-modal" data-individual-modal="view-{{ objetivo.id }}" aria-hidden="true"><div class="objective-modal-backdrop" data-close-individual-modal></div><section class="objective-modal-card objective-view-card" role="dialog" aria-modal="true"><div class="objective-modal-header"><div><span class="eyebrow">REGISTO INDIVIDUAL</span><h2>{{ objetivo.description }}</h2></div><button class="objective-modal-close" type="button" data-close-individual-modal aria-label="Fechar">×</button></div><div class="objective-summary"><div><small>REsponsavel</small><strong>{{ objetivo.user.get_full_name|default:objetivo.user.username }}</strong></div><div><small>DEPARTAMENTAL</small><strong>{{ objetivo.department_objective.description|truncatechars:35 }}</strong></div><div><small>ESTADO</small><strong>{{ objetivo.automatic_status_display }}</strong></div></div><div class="form-actions"><button class="button" type="button" data-close-individual-modal>Fechar</button><button class="button primary" type="button" data-switch-individual-modal="edit-{{ objetivo.id }}">Editar objetivo</button></div></section></div>
       <div class="objective-modal" data-individual-modal="edit-{{ objetivo.id }}" aria-hidden="true"><div class="objective-modal-backdrop" data-close-individual-modal></div><section class="objective-modal-card" role="dialog" aria-modal="true"><div class="objective-modal-header"><div><span class="eyebrow">EDIÇÃO INDIVIDUAL</span><h2>Editar objetivo individual</h2></div><button class="objective-modal-close" type="button" data-close-individual-modal aria-label="Fechar">×</button></div><form method="post" action="{% url 'planejamento_objetivo_individual_edit' objetivo.id %}">{% csrf_token %}<input type="hidden" name="next" value="individual_menu"><div class="form-grid"><label>Objetivo departamental<select name="department_objective" required>{% for item in departamentos %}<option value="{{ item.id }}" {% if item.id == objetivo.department_objective_id %}selected{% endif %}>{{ item.description|truncatechars:70 }} · {{ item.institutional_objective.cycle.year }}</option>{% endfor %}</select></label><label>Utilizador<select name="user" required>{% for item in users %}<option value="{{ item.id }}" {% if item.id == objetivo.user_id %}selected{% endif %}>{{ item.get_full_name|default:item.username }}</option>{% endfor %}</select></label><label style="grid-column:1 / -1">Descrição<textarea name="description" rows="4" required>{{ objetivo.description }}</textarea></label></div><div class="form-actions"><button class="button" type="button" data-close-individual-modal>Cancelar</button><button class="button primary" type="submit">Guardar alterações</button></div></form></section></div>
       <div class="objective-modal" data-individual-modal="delete-{{ objetivo.id }}" aria-hidden="true"><div class="objective-modal-backdrop" data-close-individual-modal></div><section class="objective-modal-card objective-delete-card" role="dialog" aria-modal="true"><div class="objective-modal-header"><div><span class="eyebrow">CONFIRMAR AÇÃO</span><h2>Eliminar objetivo?</h2></div><button class="objective-modal-close" type="button" data-close-individual-modal aria-label="Fechar">×</button></div><p>O objetivo <strong>{{ objetivo.description }}</strong> será removido.</p><form method="post" action="{% url 'planejamento_objetivo_individual_delete' objetivo.id %}">{% csrf_token %}<input type="hidden" name="next" value="individual_menu"><div class="form-actions"><button class="button" type="button" data-close-individual-modal>Cancelar</button><button class="button ca-delete-button" type="submit">Eliminar objetivo</button></div></form></section></div>
     {% endfor %}
@@ -37,5 +37,27 @@
 </div>
 <script>
 (function(){function closeAll(){document.querySelectorAll('[data-individual-modal]').forEach(function(m){m.setAttribute('aria-hidden','true')});document.body.classList.remove('ca-modal-open')}function openModal(name){closeAll();var m=document.querySelector('[data-individual-modal="'+name+'"]');if(m){m.setAttribute('aria-hidden','false');document.body.classList.add('ca-modal-open')}}document.addEventListener('click',function(e){var o=e.target.closest('[data-open-individual-modal]');if(o)openModal(o.dataset.openIndividualModal);var s=e.target.closest('[data-switch-individual-modal]');if(s)openModal(s.dataset.switchIndividualModal);if(e.target.closest('[data-close-individual-modal]'))closeAll()});document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll()})}());
+</script>
+<script>
+(function(){
+  var userDepartments={% for item in users %}'{{ item.id }}':'{{ item.department_profile.department_id|default:"" }}',{% endfor %}};
+  document.querySelectorAll('[data-individual-modal] form').forEach(function(form){
+    var departmentSelect=form.querySelector('[name="department_objective"]');
+    var userSelect=form.querySelector('[name="user"]');
+    if(!departmentSelect||!userSelect)return;
+    function filterUsers(){
+      var departmentId=departmentSelect.value;
+      Array.prototype.forEach.call(userSelect.options,function(option){
+        if(!option.value)return;
+        var visible=!!departmentId&&userDepartments[option.value]===departmentId;
+        option.hidden=!visible;
+        option.disabled=!visible;
+      });
+      if(userSelect.selectedOptions.length&&userSelect.selectedOptions[0].disabled)userSelect.value='';
+    }
+    departmentSelect.addEventListener('change',filterUsers);
+    filterUsers();
+  });
+}());
 </script>
 {% endblock %}

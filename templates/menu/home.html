@@ -2,30 +2,7 @@
 {% block title %}Menu | SAGD{% endblock %}
 {% block body %}
 <div class="app-shell menu-page">
-  <aside class="sidebar">
-    <div class="logo">SAGD<span>+</span></div>
-    <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Comprimir menu" aria-expanded="true"><span>‹</span></button>
-    <div class="nav-label">Menu principal</div>
-    <a class="nav-link active" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Início</span></a>
-    <div class="nav-label" style="margin-top:27px">Gestão</div>
-    <a class="nav-link" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">＋</span><span>Criar novo ciclo</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
-    <div class="sidebar-footer">
-      <div class="account-summary">
-        <div class="user-line">
-          <div class="avatar">{{ user.username|first|upper }}</div>
-          <div>
-            <strong>{{ user.get_full_name|default:user.username }}</strong>
-            <div class="user-role">Gestão de desempenho</div>
-          </div>
-        </div>
-        <span class="account-status"><i></i>Sessão ativa</span>
-      </div>
-      <form class="logout-form" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9"/></svg><span>Terminar sessão</span></button></form>
-    </div>
-  </aside>
+  {% include 'includes/management_sidebar.html' with active_menu='home' %}
 
   <div id="spa-content">
   <main class="main menu-main">

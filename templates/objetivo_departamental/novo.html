@@ -1,19 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Objetivos departamentais | SAGD{% endblock %}
 {% block body %}
-<div class="app-shell planning-objective-page">
-  <aside class="sidebar">
-    <div class="logo">SAGD<span>+</span></div>
-    <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Comprimir menu" aria-expanded="true"><span>‹</span></button>
-    <div class="nav-label">Menu principal</div>
-    <a class="nav-link" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Início</span></a>
-    <div class="nav-label" style="margin-top:27px">Gestão</div>
-    <a class="nav-link" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
-    <a class="nav-link active" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
-    <a class="nav-link" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
-    <div class="sidebar-footer"><div class="user-line"><div class="avatar">{{ user.username|first|upper }}</div><div><strong>{{ user.get_full_name|default:user.username }}</strong><div class="user-role">Gestão de desempenho</div></div></div><form class="logout-form" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit">Sair da conta →</button></form></div>
-  </aside>
+<div class="app-shell planning-objective-page{% if read_only %} is-read-only{% endif %}">
+  {% include 'includes/management_sidebar.html' with active_menu='departmental' %}
 
   <div id="spa-content">
     <main class="main">
@@ -22,7 +11,7 @@
         <a class="cycle-back" href="{% url 'menu_home' %}" data-spa-link>← Voltar ao início</a>
         <section class="objective-list-panel">
           <div class="objective-section-heading"><div><span class="eyebrow">DESDOBRAMENTO ESTRATÉGICO</span><h1>Objetivos departamentais</h1><p>Converta a estratégia institucional em resultados para cada departamento.</p></div><button class="button primary" type="button" data-open-department-modal="create">Novo objetivo <span>＋</span></button></div>
-          {% if objetivos %}<div class="objective-record-list">{% for objetivo in objetivos %}<article class="objective-record"><div class="objective-record-icon objective-department-icon">◈</div><div class="objective-record-info"><strong>{{ objetivo.description }}</strong><span>Institucional: {{ objetivo.institutional_objective.description|truncatechars:70 }}</span><span>Ciclo: {{ objetivo.institutional_objective.cycle.name }} · {{ objetivo.institutional_objective.cycle.year }}</span></div><span class="objective-status objective-status-{{ objetivo.automatic_status }}">{{ objetivo.automatic_status_display }}</span><div class="objective-record-actions"><button class="button" type="button" data-open-department-modal="view-{{ objetivo.id }}">Abrir</button><button class="button" type="button" data-open-department-modal="edit-{{ objetivo.id }}">Editar</button><button class="button ca-delete-button" type="button" data-open-department-modal="delete-{{ objetivo.id }}">Eliminar</button></div></article>{% endfor %}</div>{% else %}<div class="objective-empty"><span>◈</span><h2>Nenhum objetivo departamental</h2><p>Crie o primeiro objetivo a partir do objetivo institucional ativo.</p><button class="button primary" type="button" data-open-department-modal="create" {% if not institucional %}disabled{% endif %}>Criar objetivo <span>＋</span></button>{% if not institucional %}<small class="objective-field-note">É necessário existir um objetivo institucional num ciclo em andamento.</small>{% endif %}</div>{% endif %}
+          {% if objetivos %}<div class="objective-record-list">{% for objetivo in objetivos %}<article class="objective-record"><div class="objective-record-icon objective-department-icon">◈</div><div class="objective-record-info"><strong>{{ objetivo.description }}</strong><span>Institucional: {{ objetivo.institutional_objective.description|truncatechars:70 }}</span>{% if is_council_user %}<span>Departamento: {{ objetivo.department.name|default:'Não atribuído' }}</span>{% endif %}<span>Ciclo: {{ objetivo.institutional_objective.cycle.name }} · {{ objetivo.institutional_objective.cycle.year }}</span></div><span class="objective-status objective-status-{{ objetivo.automatic_status }}">{{ objetivo.automatic_status_display }}</span><div class="objective-record-actions"><button class="button" type="button" data-open-department-modal="view-{{ objetivo.id }}">Abrir</button><button class="button" type="button" data-open-department-modal="edit-{{ objetivo.id }}">Editar</button><button class="button ca-delete-button" type="button" data-open-department-modal="delete-{{ objetivo.id }}">Eliminar</button></div></article>{% endfor %}</div>{% else %}<div class="objective-empty"><span>◈</span><h2>Nenhum objetivo departamental</h2><p>Crie o primeiro objetivo a partir do objetivo institucional ativo.</p><button class="button primary" type="button" data-open-department-modal="create" {% if not institucional %}disabled{% endif %}>Criar objetivo <span>＋</span></button>{% if not institucional %}<small class="objective-field-note">É necessário existir um objetivo institucional num ciclo em andamento.</small>{% endif %}</div>{% endif %}
         </section>
       </div>
     </main>

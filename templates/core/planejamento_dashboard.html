@@ -18,16 +18,7 @@
         <span class="planning-menu-disabled">Individual após departamental</span>
       </details>
     {% endif %}
-    <div class="sidebar-footer">
-      <div class="user-line">
-        <div class="avatar">{{ user.username|first|upper }}</div>
-        <div>
-          <strong>{{ user.get_full_name|default:user.username }}</strong>
-          <div class="user-role">{% if user.is_superuser %}Administrador{% else %}Utilizador{% endif %}</div>
-        </div>
-      </div>
-      <a class="logout" href="{% url 'logout' %}">Sair da conta →</a>
-    </div>
+    {% include 'includes/sidebar_account.html' with account_role=user.groups.first.name|default:'Utilizador' %}
   </aside>
 
   <main class="main">

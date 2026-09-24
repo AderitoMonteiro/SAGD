@@ -7,7 +7,6 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('', views.menu_home, name='menu_home'),
-    path('painel/', views.dashboard, name='dashboard'),
     path('fluxo/', views.process_flow, name='process_flow'),
     path('planejamento/', views.planejamento_dashboard, name='planejamento_dashboard'),
     path('planejamento/ciclos/novo/', views.planejamento_ciclo_create, name='planejamento_ciclo_create'),
