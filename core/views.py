@@ -70,6 +70,31 @@ def objective_department_for_request(request, department_objective):
     return department
 
 
+def get_department_summaries():
+    summaries = []
+    departments = Department.objects.filter(is_active=True).prefetch_related(
+        'users__user__groups', 'objectives__individual_objectives'
+    )
+    for department in departments:
+        department_objective_count = department.objectives.count()
+        individual_objective_count = sum(
+            objective.individual_objectives.count()
+            for objective in department.objectives.all()
+        )
+        collaborators = [
+            profile.user for profile in department.users.all()
+            if any(group.name == 'Colaborador' for group in profile.user.groups.all())
+        ]
+        if department_objective_count or collaborators:
+            summaries.append({
+                'department': department,
+                'department_objective_count': department_objective_count,
+                'individual_objective_count': individual_objective_count,
+                'collaborators': collaborators,
+            })
+    return summaries
+
+
 def can_plan(user):
     return is_management(user) or is_council(user)
 
@@ -117,27 +142,6 @@ def menu_home(request):
         active_cycle = Cycle.objects.filter(
             start_date__lte=timezone.localdate(), end_date__gte=timezone.localdate()
         ).order_by('-start_date').first()
-        department_summaries = []
-        departments = Department.objects.filter(is_active=True).prefetch_related(
-            'users__user__groups', 'objectives__individual_objectives'
-        )
-        for department in departments:
-            department_objective_count = department.objectives.count()
-            individual_objective_count = sum(
-                objective.individual_objectives.count()
-                for objective in department.objectives.all()
-            )
-            collaborators = [
-                profile.user for profile in department.users.all()
-                if any(group.name == 'Colaborador' for group in profile.user.groups.all())
-            ]
-            if department_objective_count or collaborators:
-                department_summaries.append({
-                    'department': department,
-                    'department_objective_count': department_objective_count,
-                    'individual_objective_count': individual_objective_count,
-                    'collaborators': collaborators,
-                })
         return render(request, 'gestor/dashboard.html', {
             'active_cycle': active_cycle,
             'department_total': department_objectives.count(),
@@ -146,7 +150,7 @@ def menu_home(request):
             'active_individual_total': sum(item.automatic_status == 'active' for item in individual_objectives),
             'department_objectives': department_objectives[:5],
             'individual_objectives': individual_objectives[:5],
-            'department_summaries': department_summaries,
+            'department_summaries': get_department_summaries(),
         })
 
     cycles = Cycle.objects.all()
@@ -183,6 +187,7 @@ def menu_home(request):
         'level_chart': level_chart,
         'level_total': level_total,
         'department_chart': department_chart[:6],
+        'department_summaries': get_department_summaries() if is_council(request.user) else [],
     }
     return render(request, 'menu/home.html', context)
 
@@ -516,7 +521,11 @@ def planejamento_objetivo_individual_menu(request):
         IndividualObjective.objects.create(department_objective=department, user=user, description=description, status='active')
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_objetivo_individual_menu')
-    objetivos = IndividualObjective.objects.select_related('department_objective__institutional_objective__cycle', 'user').order_by('-date_created')
+    objetivos = IndividualObjective.objects.select_related(
+        'department_objective__institutional_objective__cycle',
+        'department_objective__department',
+        'user',
+    ).order_by('-date_created')
     return render(request, 'objetivo_individual/novo.html', {
         'objetivos': objetivos,
         'departamentos': departamentos,
