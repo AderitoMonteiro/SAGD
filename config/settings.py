@@ -94,13 +94,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': os.getenv('MYSQL_ENGINE', 'core.mysql_backend'),
-        #'NAME': os.getenv('MYSQL_DATABASE', 'sagd'),
-        'NAME': os.getenv('MYSQL_DATABASE', 'u981745852_sgad'),
-        #'USER': os.getenv('MYSQL_USER', 'root'),
-        'USER': os.getenv('MYSQL_USER', 'u981745852_root'),
-        'PASSWORD': os.getenv('MYSQL_PASSWORD', 'A07971.sgad'),
-        #'HOST': os.getenv('MYSQL_HOST', '127.0.0.1'),
-        'HOST': os.getenv('MYSQL_HOST', '193.203.168.173'),
+        'NAME': os.getenv('MYSQL_DATABASE', 'sagd'),
+        #'NAME': os.getenv('MYSQL_DATABASE', 'u981745852_sgad'),
+        'USER': os.getenv('MYSQL_USER', 'root'),
+        'PASSWORD': os.getenv('MYSQL_PASSWORD', ''),
+        'HOST': os.getenv('MYSQL_HOST', '127.0.0.1'),
         'PORT': os.getenv('MYSQL_PORT', '3306'),
         'OPTIONS': {
             'charset': 'utf8mb4',

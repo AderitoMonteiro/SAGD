@@ -20,6 +20,7 @@ staticfiles/
 .env
 .env.*
 !.env.example
+.server-*.log
 
 # Testes, cobertura e ferramentas
 .coverage

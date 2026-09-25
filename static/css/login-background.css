@@ -1,0 +1,10 @@
+.login-art{
+  background:
+    linear-gradient(90deg,rgba(6,30,61,.96) 0%,rgba(6,30,61,.82) 48%,rgba(6,30,61,.35) 100%),
+    url('../images/incv-login-background.png') center/cover no-repeat;
+}
+
+.login-art > *{
+  position:relative;
+  z-index:1;
+}

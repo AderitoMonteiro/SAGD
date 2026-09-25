@@ -1,0 +1,12 @@
+.council-cycle-progress-standalone{
+  margin-top:20px;
+  padding:24px;
+  background:#fff;
+  border:1px solid rgba(9,43,87,.1);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+}
+
+@media (max-width:600px){
+  .council-cycle-progress-standalone{padding:20px;}
+}

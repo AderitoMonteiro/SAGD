@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 {% block title %}Objetivos individuais | SAGD{% endblock %}
 {% block body %}
-<div class="app-shell planning-objective-page{% if read_only %} is-read-only{% endif %}">
+<div class="app-shell planning-objective-page">
   {% include 'includes/management_sidebar.html' with active_menu='individual' %}
 
-  <div id="spa-content">
+  <div id="spa-content"{% if read_only %} class="is-read-only"{% endif %}>
     <main class="main">
       <div class="topbar"><div class="breadcrumb">SAGD <span>/</span> <strong>Objetivos individuais</strong></div></div>
       <div class="objective-content">
