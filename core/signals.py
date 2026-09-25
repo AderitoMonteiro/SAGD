@@ -15,6 +15,6 @@ def create_access_groups(sender, **kwargs):
 
 
 @receiver(post_save, sender=get_user_model())
-def create_user_department(sender, instance, created, **kwargs):
-    if created:
+def create_user_department(sender, instance, created, raw=False, **kwargs):
+    if created and not raw:
         UserDepartment.objects.get_or_create(user=instance)
