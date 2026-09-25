@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Cycle, Department, DepartmentObjective, Evaluation, InstitutionalObjective, UserDepartment
+from .models import Cycle, Department, DepartmentObjective, Domain, Evaluation, InstitutionalObjective, UserDepartment
 
 
 @admin.register(Cycle)
@@ -51,14 +51,21 @@ class SAGDUserAdmin(UserAdmin):
 
 @admin.register(InstitutionalObjective)
 class InstitutionalObjectiveAdmin(admin.ModelAdmin):
-    list_display = ('description', 'cycle', 'status', 'date_created')
-    list_filter = ('status', 'cycle')
+    list_display = ('description', 'domain', 'cycle', 'status', 'date_created')
+    list_filter = ('status', 'domain', 'cycle')
     search_fields = ('description', 'cycle__name')
 
 
 @admin.register(DepartmentObjective)
 class DepartmentObjectiveAdmin(admin.ModelAdmin):
-    list_display = ('description', 'department', 'institutional_objective', 'status', 'date_created')
-    list_filter = ('status', 'department', 'institutional_objective__cycle')
+    list_display = ('description', 'department', 'domain', 'institutional_objective', 'status', 'date_created')
+    list_filter = ('status', 'department', 'domain', 'institutional_objective__cycle')
     search_fields = ('description', 'department__name', 'department__code', 'institutional_objective__description')
     autocomplete_fields = ('department', 'institutional_objective')
+
+
+@admin.register(Domain)
+class DomainAdmin(admin.ModelAdmin):
+    list_display = ('description', 'type', 'domain_description', 'date_update')
+    list_filter = ('type',)
+    search_fields = ('description', 'domain_description')

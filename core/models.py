@@ -116,6 +116,7 @@ class Validation(models.Model):
 class InstitutionalObjective(models.Model):
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='institutional_objectives')
+    domain = models.ForeignKey('Domain', on_delete=models.SET_NULL, null=True, blank=True, related_name='institutional_objectives', verbose_name='domínio')
     description = models.CharField('descrição', max_length=200)
     status = models.CharField('status', max_length=15, choices=STATUS_CHOICES, default='draft')
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
@@ -183,6 +184,7 @@ class DepartmentObjective(models.Model):
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     institutional_objective = models.ForeignKey(InstitutionalObjective, on_delete=models.CASCADE, related_name='department_objectives')
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='objectives', verbose_name='departamento')
+    domain = models.ForeignKey('Domain', on_delete=models.SET_NULL, null=True, blank=True, related_name='department_objectives', verbose_name='domínio')
     description = models.CharField('descrição', max_length=200)
     status = models.CharField('status', max_length=15, choices=STATUS_CHOICES, default='draft')
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
@@ -209,6 +211,7 @@ class IndividualObjective(models.Model):
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     department_objective = models.ForeignKey(DepartmentObjective, on_delete=models.CASCADE, related_name='individual_objectives')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='individual_objectives')
+    domain = models.ForeignKey('Domain', on_delete=models.SET_NULL, null=True, blank=True, related_name='individual_objectives', verbose_name='domínio')
     description = models.CharField('descrição', max_length=200)
     status = models.CharField('status', max_length=15, choices=STATUS_CHOICES, default='draft')
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
@@ -229,3 +232,20 @@ class IndividualObjective(models.Model):
     @property
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
+
+
+class Domain(models.Model):
+    description = models.CharField('descrição', max_length=100)
+    type = models.IntegerField('tipo')
+    domain_description = models.CharField('descrição do domínio', max_length=100)
+    date_created = models.DateTimeField('data de criação', auto_now_add=True)
+    date_update = models.DateTimeField('data de atualização', auto_now=True)
+
+    class Meta:
+        db_table = 'domain'
+        ordering = ['description']
+        verbose_name = 'domínio'
+        verbose_name_plural = 'domínios'
+
+    def __str__(self):
+        return self.description
