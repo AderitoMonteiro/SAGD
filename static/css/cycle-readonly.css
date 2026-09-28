@@ -1,0 +1,1 @@
+#spa-content.is-read-only [data-open-cycle-modal="create"],#spa-content.is-read-only [data-open-cycle-modal^="toggle-"],#spa-content.is-read-only [data-open-cycle-modal^="edit-"],#spa-content.is-read-only [data-open-cycle-modal^="delete-"],#spa-content.is-read-only [data-switch-cycle-modal]{display:none!important}

@@ -1,0 +1,1 @@
+#spa-content.is-read-only [data-open-objective-modal="create"],#spa-content.is-read-only [data-open-objective-modal^="toggle-"],#spa-content.is-read-only [data-open-objective-modal^="edit-"],#spa-content.is-read-only [data-open-objective-modal^="delete-"],#spa-content.is-read-only [data-switch-objective-modal]{display:none!important}

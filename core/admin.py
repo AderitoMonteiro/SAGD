@@ -7,8 +7,8 @@ from .models import Cycle, Department, DepartmentObjective, Domain, Evaluation, 
 
 @admin.register(Cycle)
 class CycleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'year', 'status', 'start_date', 'end_date')
-    list_filter = ('status', 'year')
+    list_display = ('name', 'year', 'domain', 'status', 'start_date', 'end_date')
+    list_filter = ('status', 'domain', 'year')
 
 
 @admin.register(Evaluation)

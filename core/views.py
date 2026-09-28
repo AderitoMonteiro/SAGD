@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import (Cycle, Department, DepartmentObjective, Evaluation, FollowUp, IndividualObjective,
+from .models import (Cycle, Department, DepartmentObjective, Domain, Evaluation, FollowUp, IndividualObjective,
                     InstitutionalObjective, Objective, UserDepartment, Validation)
 
 
@@ -19,6 +19,23 @@ PHASES = [
     ('05', 'Feedback e validação', 'Janeiro', 'Validação da chefia, RH e Conselho'),
     ('06', 'Encerramento', 'Até 15 jan', 'Arquivo do resultado e novo ciclo'),
 ]
+
+
+def cycle_domain_for_type(domain_type):
+    """Obtém o domínio do ciclo pelo seu type, nunca pelo id."""
+    domain = Domain.objects.filter(type=domain_type).order_by('id').first()
+    if domain:
+        return domain
+    labels = {
+        1: ('Aberto', 'Ciclo aberto'),
+        2: ('Concluído', 'Ciclo concluído'),
+    }
+    description, domain_description = labels[domain_type]
+    return Domain.objects.create(
+        description=description,
+        type=domain_type,
+        domain_description=domain_description,
+    )
 
 
 def cycle_list_context(request):
@@ -33,11 +50,29 @@ def cycle_list_context(request):
 
 
 def is_management(user):
-    return user.is_superuser or user.groups.filter(name__in=['Administrador', 'RH', 'Gestor']).exists()
+    return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Gestor']).exists()
 
 
 def is_council(user):
     return user.is_superuser or user.groups.filter(name='Conselho de Administração').exists()
+
+
+def is_hr(user):
+    return user.is_authenticated and not user.is_superuser and user.groups.filter(name='RH').exists()
+
+
+def can_manage_institutional_objectives(user):
+    return user.is_authenticated and not is_council(user) and (
+        user.is_superuser or is_hr(user) or user.groups.filter(name='Administrador').exists()
+    )
+
+
+def can_manage_cycles(user):
+    return user.is_authenticated and (
+        user.is_superuser
+        or is_council(user)
+        or user.groups.filter(name='Administrador').exists()
+    )
 
 
 def is_manager(user):
@@ -50,7 +85,9 @@ def is_manager(user):
 
 
 def can_manage_operational_objectives(user):
-    return user.is_authenticated and user.groups.filter(name='Gestor').exists()
+    return user.is_authenticated and (
+        user.is_superuser or user.groups.filter(name='Administrador').exists()
+    )
 
 
 def user_department(user):
@@ -246,6 +283,7 @@ def menu_home(request):
             department_objectives = department_objectives.none()
             individual_objectives = individual_objectives.none()
 
+        department_objective_list = list(department_objectives)
         individual_objective_list = list(individual_objectives)
         collaborators = get_user_model().objects.filter(
             is_active=True,
@@ -268,6 +306,14 @@ def menu_home(request):
                 'completed': completed,
                 'percentage': round(completed * 100 / total) if total else 0,
             })
+        department_progress_total = len(department_objective_list)
+        department_progress_completed = sum(
+            objective.automatic_status == 'completed'
+            for objective in department_objective_list
+        )
+        department_progress_percentage = round(
+            department_progress_completed * 100 / department_progress_total
+        ) if department_progress_total else 0
         progress_total = len(individual_objective_list)
         progress_completed = sum(
             objective.status == 'completed' for objective in individual_objective_list
@@ -281,11 +327,15 @@ def menu_home(request):
         )
         return render(request, 'gestor/dashboard.html', {
             'active_cycle': active_cycle,
-            'department_total': department_objectives.count(),
+            'department_total': len(department_objective_list),
             'individual_total': individual_objectives.count(),
-            'active_department_total': sum(item.automatic_status == 'active' for item in department_objectives),
+            'active_department_total': sum(item.automatic_status == 'active' for item in department_objective_list),
             'active_individual_total': sum(item.automatic_status == 'active' for item in individual_objectives),
-            'department_objectives': department_objectives[:5],
+            'department_objectives': department_objective_list[:5],
+            'department_progress_total': department_progress_total,
+            'department_progress_completed': department_progress_completed,
+            'department_progress_pending': department_progress_total - department_progress_completed,
+            'department_progress_percentage': department_progress_percentage,
             'individual_objectives': individual_objectives[:5],
             'department_summaries': get_department_summaries(),
             'manager_department': manager_department,
@@ -298,8 +348,73 @@ def menu_home(request):
             'monthly_manager_points': monthly_manager_points,
         })
 
+    if is_hr(request.user):
+        cycles = Cycle.objects.all()
+        active_cycle = next((cycle for cycle in cycles if cycle.automatic_status == 'active'), None)
+        institutional_objective_list = list(
+            InstitutionalObjective.objects.select_related('cycle', 'domain')
+            .order_by('-date_created')
+        )
+        institutional_dashboard_objectives = institutional_objective_list[:5]
+        institutional_active_count = sum(
+            item.automatic_status == 'active'
+            for item in institutional_objective_list
+        )
+        institutional_completed_count = sum(
+            item.automatic_status == 'completed'
+            for item in institutional_objective_list
+        )
+        institutional_total = len(institutional_objective_list)
+        department_summaries = [
+            item for item in get_department_summaries()
+            if item['department_objective_count']
+        ]
+        department_total = sum(
+            item['department_objective_count'] for item in department_summaries
+        )
+        department_completed = sum(
+            item['completed_department_objective_count'] for item in department_summaries
+        )
+        monthly_completion_progress, monthly_completion_points = (
+            get_current_cycle_monthly_progress(active_cycle)
+            if active_cycle else ([], '')
+        )
+        return render(request, 'rh/dashboard.html', {
+            'active_cycle': active_cycle,
+            'cycles_count': cycles.count(),
+            'department_summaries': department_summaries,
+            'department_total': department_total,
+            'department_completed': department_completed,
+            'department_pending': department_total - department_completed,
+            'department_completion_percentage': round(
+                department_completed * 100 / department_total
+            ) if department_total else 0,
+            'department_count': len(department_summaries),
+            'institutional_count': InstitutionalObjective.objects.count(),
+            'individual_count': IndividualObjective.objects.count(),
+            'institutional_dashboard_objectives': institutional_dashboard_objectives,
+            'institutional_total': institutional_total,
+            'institutional_active_count': institutional_active_count,
+            'institutional_completed_count': institutional_completed_count,
+            'institutional_active_percentage': round(
+                institutional_active_count * 100 / institutional_total
+            ) if institutional_total else 0,
+            'monthly_completion_progress': monthly_completion_progress,
+            'monthly_completion_points': monthly_completion_points,
+        })
+
     cycles = Cycle.objects.all()
     active_cycle = next((cycle for cycle in cycles if cycle.automatic_status == 'active'), None)
+    institutional_objectives = list(
+        InstitutionalObjective.objects.select_related('cycle', 'domain').order_by('-date_created')
+    )
+    institutional_active_count = sum(
+        item.automatic_status == 'active' for item in institutional_objectives
+    )
+    institutional_completed_count = sum(
+        item.automatic_status == 'completed' for item in institutional_objectives
+    )
+    institutional_total = institutional_active_count + institutional_completed_count
     active_objectives_count = sum(item.automatic_status == 'active' for item in InstitutionalObjective.objects.all()) + sum(item.automatic_status == 'active' for item in DepartmentObjective.objects.all()) + sum(item.automatic_status == 'active' for item in IndividualObjective.objects.all())
     completed_objectives_count = sum(item.automatic_status == 'completed' for item in InstitutionalObjective.objects.all()) + sum(item.automatic_status == 'completed' for item in DepartmentObjective.objects.all()) + sum(item.automatic_status == 'completed' for item in IndividualObjective.objects.all())
     objective_total = active_objectives_count + completed_objectives_count
@@ -338,6 +453,13 @@ def menu_home(request):
         'cycles_count': cycles.count(),
         'active_cycle': active_cycle,
         'institutional_count': InstitutionalObjective.objects.count(),
+        'institutional_dashboard_objectives': institutional_objectives[:5],
+        'institutional_active_count': institutional_active_count,
+        'institutional_completed_count': institutional_completed_count,
+        'institutional_total': institutional_total,
+        'institutional_active_percentage': round(
+            institutional_active_count * 100 / institutional_total
+        ) if institutional_total else 0,
         'departmental_count': DepartmentObjective.objects.count(),
         'individual_count': IndividualObjective.objects.count(),
         'user_count': get_user_model().objects.filter(is_active=True).count(),
@@ -408,6 +530,9 @@ def planejamento_ciclo_detail(request, cycle_id):
 
 @login_required
 def planejamento_ciclo_create(request):
+    if request.method == 'POST' and not can_manage_cycles(request.user):
+        messages.error(request, 'O seu perfil possui apenas acesso de consulta aos ciclos.')
+        return redirect('planejamento_ciclo_create')
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         year = request.POST.get('year', '').strip()
@@ -421,18 +546,25 @@ def planejamento_ciclo_create(request):
             year=int(year),
             start_date=start_date,
             end_date=end_date,
+            domain=cycle_domain_for_type(1),
             status=request.POST.get('status', 'planned'),
         )
         messages.success(request, f'Ciclo {cycle} criado com sucesso.')
         return redirect('planejamento_ciclo_create')
     context = cycle_list_context(request)
-    context['editing'] = False
+    context.update({'editing': False, 'read_only': not can_manage_cycles(request.user)})
     return render(request, 'ciclo/novo.html', context)
 
 
 @login_required
 def planejamento_ciclo_edit(request, cycle_id):
+    if not can_manage_cycles(request.user):
+        messages.error(request, 'O seu perfil possui apenas acesso de consulta aos ciclos.')
+        return redirect('planejamento_ciclo_create')
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if not cycle.domain_id or cycle.domain.type != 1:
+        messages.error(request, 'Apenas ciclos abertos podem ser editados.')
+        return redirect('planejamento_ciclo_create')
     if request.method == 'POST':
         cycle.name = request.POST.get('name', cycle.name).strip()
         cycle.year = request.POST.get('year', cycle.year)
@@ -449,12 +581,44 @@ def planejamento_ciclo_edit(request, cycle_id):
 
 @login_required
 def planejamento_ciclo_delete(request, cycle_id):
+    if not can_manage_cycles(request.user):
+        messages.error(request, 'O seu perfil possui apenas acesso de consulta aos ciclos.')
+        return redirect('planejamento_ciclo_create')
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if not cycle.domain_id or cycle.domain.type != 1:
+        messages.error(request, 'Apenas ciclos abertos podem ser eliminados.')
+        return redirect('planejamento_ciclo_create')
     if request.method == 'POST':
         cycle.delete()
         messages.success(request, 'Ciclo removido com sucesso.')
         return redirect('planejamento_ciclo_create')
     return redirect('planejamento_ciclo_detail', cycle_id=cycle.id)
+
+
+@planning_required
+def planejamento_ciclo_toggle_status(request, cycle_id):
+    if not can_manage_cycles(request.user):
+        messages.error(request, 'O seu perfil possui apenas acesso de consulta aos ciclos.')
+        return redirect('planejamento_ciclo_create')
+    cycle = get_object_or_404(Cycle.objects.select_related('domain'), pk=cycle_id)
+    if request.method != 'POST':
+        return redirect('planejamento_ciclo_create')
+
+    target_type = request.POST.get('target_type')
+    if target_type not in {'1', '2'}:
+        messages.error(request, 'Selecione o novo estado do ciclo.')
+        return redirect('planejamento_ciclo_create')
+    target_type = int(target_type)
+    current_type = 1 if cycle.is_open else 2
+    if target_type == current_type:
+        messages.info(request, 'O ciclo já se encontra nesse estado.')
+        return redirect('planejamento_ciclo_create')
+    cycle.domain = cycle_domain_for_type(target_type)
+    cycle.status = 'closed' if target_type == 2 else 'active'
+    cycle.save(update_fields=['domain', 'status'])
+    action = 'concluído' if target_type == 2 else 'reaberto'
+    messages.success(request, f'Ciclo {action} com sucesso.')
+    return redirect('planejamento_ciclo_create')
 
 
 @login_required
@@ -464,6 +628,10 @@ def planejamento_objetivo_institucional_menu(request):
     if current_cycle:
         cycles.remove(current_cycle)
         cycles.insert(0, current_cycle)
+    read_only = not can_manage_institutional_objectives(request.user)
+    if request.method == 'POST' and read_only:
+        messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
+        return redirect('planejamento_objetivo_institucional_menu')
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
         if not description:
@@ -481,7 +649,7 @@ def planejamento_objetivo_institucional_menu(request):
         .distinct()
     )
     selected_year = request.GET.get('year', '').strip()
-    objetivos = InstitutionalObjective.objects.select_related('cycle').order_by('-date_created')
+    objetivos = InstitutionalObjective.objects.select_related('cycle', 'domain').order_by('-date_created')
     if selected_year.isdigit() and int(selected_year) in years:
         objetivos = objetivos.filter(cycle__year=int(selected_year))
     else:
@@ -492,11 +660,15 @@ def planejamento_objetivo_institucional_menu(request):
         'current_cycle': current_cycle,
         'years': years,
         'selected_year': selected_year,
+        'read_only': read_only,
     })
 
 
 @login_required
 def planejamento_objetivo_institucional_create(request, cycle_id):
+    if not can_manage_institutional_objectives(request.user):
+        messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
+        return redirect('planejamento_objetivo_institucional_menu')
     cycle = get_object_or_404(Cycle, pk=cycle_id)
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
@@ -542,7 +714,7 @@ def planejamento_objetivo_departamental_menu(request):
         messages.success(request, 'Objetivo departamental criado.')
         return redirect('planejamento_objetivo_departamental_menu')
     objetivos = DepartmentObjective.objects.select_related(
-        'institutional_objective__cycle', 'department'
+        'institutional_objective__cycle', 'department', 'domain'
     ).order_by('-date_created')
     return render(request, 'objetivo_departamental/novo.html', {
         'objetivos': objetivos,
@@ -554,7 +726,13 @@ def planejamento_objetivo_departamental_menu(request):
 
 @login_required
 def planejamento_objetivo_institucional_edit(request, objetivo_id):
+    if not can_manage_institutional_objectives(request.user):
+        messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
+        return redirect('planejamento_objetivo_institucional_menu')
     objetivo = get_object_or_404(InstitutionalObjective, pk=objetivo_id)
+    if not objetivo.domain_id or objetivo.domain.type != 1:
+        messages.error(request, 'Apenas objetivos abertos podem ser editados.')
+        return redirect('planejamento_objetivo_institucional_menu')
     if request.method == 'POST':
         objetivo.description = request.POST.get('description', objetivo.description).strip()
         objetivo.status = request.POST.get('status', objetivo.status)
@@ -568,7 +746,13 @@ def planejamento_objetivo_institucional_edit(request, objetivo_id):
 
 @login_required
 def planejamento_objetivo_institucional_delete(request, objetivo_id):
+    if not can_manage_institutional_objectives(request.user):
+        messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
+        return redirect('planejamento_objetivo_institucional_menu')
     objetivo = get_object_or_404(InstitutionalObjective, pk=objetivo_id)
+    if not objetivo.domain_id or objetivo.domain.type != 1:
+        messages.error(request, 'Apenas objetivos abertos podem ser eliminados.')
+        return redirect('planejamento_objetivo_institucional_menu')
     if request.method == 'POST':
         cycle_id = objetivo.cycle_id
         objetivo.delete()
@@ -577,6 +761,35 @@ def planejamento_objetivo_institucional_delete(request, objetivo_id):
             return redirect('planejamento_objetivo_institucional_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=cycle_id)
     return redirect('planejamento_ciclo_detail', cycle_id=objetivo.cycle_id)
+
+
+@login_required
+def planejamento_objetivo_institucional_toggle_status(request, objetivo_id):
+    if not can_manage_institutional_objectives(request.user):
+        messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
+        return redirect('planejamento_objetivo_institucional_menu')
+    objetivo = get_object_or_404(
+        InstitutionalObjective.objects.select_related('domain'), pk=objetivo_id
+    )
+    if request.method != 'POST':
+        return redirect('planejamento_objetivo_institucional_menu')
+
+    target_type = request.POST.get('target_type')
+    if target_type not in {'1', '2'}:
+        messages.error(request, 'Selecione o novo estado do objetivo.')
+        return redirect('planejamento_objetivo_institucional_menu')
+    target_type = int(target_type)
+    current_type = 1 if objetivo.is_open else 2
+    if target_type == current_type:
+        messages.info(request, 'O objetivo já se encontra nesse estado.')
+        return redirect('planejamento_objetivo_institucional_menu')
+
+    objetivo.domain = cycle_domain_for_type(target_type)
+    objetivo.status = 'completed' if target_type == 2 else 'active'
+    objetivo.save(update_fields=['domain', 'status', 'date_update'])
+    action = 'concluído' if target_type == 2 else 'reaberto'
+    messages.success(request, f'Objetivo institucional {action} com sucesso.')
+    return redirect('planejamento_objetivo_institucional_menu')
 
 
 @objective_write_required
@@ -605,6 +818,9 @@ def planejamento_objetivo_departamental_create(request, objetivo_id):
 @objective_write_required
 def planejamento_objetivo_departamental_edit(request, objetivo_id):
     objetivo = get_object_or_404(DepartmentObjective, pk=objetivo_id)
+    if not objetivo.domain_id or objetivo.domain.type != 1:
+        messages.error(request, 'Apenas objetivos abertos podem ser editados.')
+        return redirect('planejamento_objetivo_departamental_menu')
     if request.method == 'POST':
         objetivo.description = request.POST.get('description', objetivo.description).strip()
         institutional_objective_id = request.POST.get('institutional_objective')
@@ -622,6 +838,9 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
 @objective_write_required
 def planejamento_objetivo_departamental_delete(request, objetivo_id):
     objetivo = get_object_or_404(DepartmentObjective, pk=objetivo_id)
+    if not objetivo.domain_id or objetivo.domain.type != 1:
+        messages.error(request, 'Apenas objetivos abertos podem ser eliminados.')
+        return redirect('planejamento_objetivo_departamental_menu')
     if request.method == 'POST':
         cycle_id = objetivo.institutional_objective.cycle_id
         objetivo.delete()
@@ -630,6 +849,32 @@ def planejamento_objetivo_departamental_delete(request, objetivo_id):
             return redirect('planejamento_objetivo_departamental_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=cycle_id)
     return redirect('planejamento_ciclo_detail', cycle_id=objetivo.institutional_objective.cycle_id)
+
+
+@objective_write_required
+def planejamento_objetivo_departamental_toggle_status(request, objetivo_id):
+    objetivo = get_object_or_404(
+        DepartmentObjective.objects.select_related('domain'), pk=objetivo_id
+    )
+    if request.method != 'POST':
+        return redirect('planejamento_objetivo_departamental_menu')
+
+    target_type = request.POST.get('target_type')
+    if target_type not in {'1', '2'}:
+        messages.error(request, 'Selecione o novo estado do objetivo.')
+        return redirect('planejamento_objetivo_departamental_menu')
+    target_type = int(target_type)
+    current_type = 1 if objetivo.is_open else 2
+    if target_type == current_type:
+        messages.info(request, 'O objetivo já se encontra nesse estado.')
+        return redirect('planejamento_objetivo_departamental_menu')
+
+    objetivo.domain = cycle_domain_for_type(target_type)
+    objetivo.status = 'completed' if target_type == 2 else 'active'
+    objetivo.save(update_fields=['domain', 'status', 'date_update'])
+    action = 'concluído' if target_type == 2 else 'reaberto'
+    messages.success(request, f'Objetivo departamental {action} com sucesso.')
+    return redirect('planejamento_objetivo_departamental_menu')
 
 
 @objective_write_required

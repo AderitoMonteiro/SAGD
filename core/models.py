@@ -9,6 +9,7 @@ class Cycle(models.Model):
     year = models.PositiveIntegerField('ano')
     start_date = models.DateField('início')
     end_date = models.DateField('fim')
+    domain = models.ForeignKey('Domain', on_delete=models.SET_NULL, null=True, blank=True, related_name='cycles', verbose_name='domínio')
     status = models.CharField('status', max_length=20, choices=STATUS_CHOICES, default='active')
 
     class Meta:
@@ -19,14 +20,34 @@ class Cycle(models.Model):
     def __str__(self):
         return f'{self.name} {self.year}'
 
+    def save(self, *args, **kwargs):
+        if not self.domain_id:
+            open_domain = Domain.objects.filter(type=1).order_by('id').first()
+            if not open_domain:
+                open_domain = Domain.objects.create(
+                    description='Aberto',
+                    type=1,
+                    domain_description='Ciclo aberto',
+                )
+            self.domain = open_domain
+        super().save(*args, **kwargs)
+
     @property
     def automatic_status(self):
+        if self.domain_id and self.domain.type == 2:
+            return 'closed'
+        if self.domain_id and self.domain.type == 1:
+            return 'active'
         today = timezone.localdate()
         if today < self.start_date:
             return 'planned'
         if today <= self.end_date:
             return 'active'
         return 'closed'
+
+    @property
+    def is_open(self):
+        return self.automatic_status != 'closed'
 
     @property
     def automatic_status_display(self):
@@ -130,9 +151,29 @@ class InstitutionalObjective(models.Model):
     def __str__(self):
         return self.description
 
+    def save(self, *args, **kwargs):
+        if not self.domain_id:
+            open_domain = Domain.objects.filter(type=1).order_by('id').first()
+            if not open_domain:
+                open_domain = Domain.objects.create(
+                    description='Aberto',
+                    type=1,
+                    domain_description='Objetivo aberto',
+                )
+            self.domain = open_domain
+        super().save(*args, **kwargs)
+
     @property
     def automatic_status(self):
+        if self.domain_id and self.domain.type == 2:
+            return 'completed'
+        if self.domain_id and self.domain.type == 1:
+            return 'active'
         return 'completed' if self.cycle.automatic_status == 'closed' else 'active'
+
+    @property
+    def is_open(self):
+        return self.automatic_status != 'completed'
 
     @property
     def automatic_status_display(self):
@@ -198,9 +239,29 @@ class DepartmentObjective(models.Model):
     def __str__(self):
         return self.description
 
+    def save(self, *args, **kwargs):
+        if not self.domain_id:
+            open_domain = Domain.objects.filter(type=1).order_by('id').first()
+            if not open_domain:
+                open_domain = Domain.objects.create(
+                    description='Aberto',
+                    type=1,
+                    domain_description='Objetivo aberto',
+                )
+            self.domain = open_domain
+        super().save(*args, **kwargs)
+
     @property
     def automatic_status(self):
+        if self.domain_id and self.domain.type == 2:
+            return 'completed'
+        if self.domain_id and self.domain.type == 1:
+            return 'active'
         return 'completed' if self.institutional_objective.cycle.automatic_status == 'closed' else 'active'
+
+    @property
+    def is_open(self):
+        return self.automatic_status != 'completed'
 
     @property
     def automatic_status_display(self):

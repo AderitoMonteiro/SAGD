@@ -9,7 +9,13 @@ def navigation_permissions(request):
         and not is_council_user
         and user.groups.filter(name='Gestor').exists()
     )
+    is_hr_user = (
+        user.is_authenticated
+        and not user.is_superuser
+        and user.groups.filter(name='RH').exists()
+    )
     return {
         'is_council_user': is_council_user,
         'is_manager_user': is_manager_user,
+        'is_hr_user': is_hr_user,
     }
