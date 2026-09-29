@@ -4,16 +4,123 @@
 <div class="app-shell ca-shell">
   {% include 'includes/management_sidebar.html' with active_menu='home' %}
   <main class="main ca-main ca-dashboard-main">
-    <div class="ca-dashboard-context"><span>CONSELHO DE ADMINISTRAÇÃO</span><strong>Planejamento estratégico</strong></div>
+    <div class="ca-dashboard-context"><span>CONSELHO DE ADMINISTRAÇÃO</span><strong>Planejamento estratégico</strong>
+    </div>
     <section class="ca-dashboard-card">
-      <header class="ca-dashboard-heading"><div><span class="eyebrow">HISTÓRICO DE PLANEJAMENTO</span><h1>Ciclos organizacionais</h1><p>Defina os períodos que orientam a avaliação e os objetivos da organização.</p></div></header>
-      {% if cycles %}<div class="ca-cycle-list">{% for item in cycles %}<article class="ca-cycle-row{% if cycle and item.id == cycle.id %} current{% endif %}"><div class="ca-cycle-mark">{{ item.year|stringformat:'s'|slice:'-2:' }}</div><div class="ca-cycle-info"><h4>{{ item.name }} <span>{{ item.year }}</span></h4><p>{{ item.start_date|date:'d/m/Y' }} a {{ item.end_date|date:'d/m/Y' }}</p></div><span class="cycle-status ca-status-{{ item.status }}">● {{ item.get_status_display }}</span><button class="button" type="button" data-open-cycle-detail="{{ item.id }}">Abrir ciclo <span>↗</span></button></article>{% endfor %}</div>{% else %}<div class="ca-empty-state ca-dashboard-empty"><div class="ca-empty-symbol">◎</div><span class="eyebrow">PRIMEIRA DEFINIÇÃO</span><h2>Nenhum ciclo criado</h2><p>Crie o primeiro ciclo para iniciar o planejamento estratégico da organização.</p><button class="button primary" type="button" data-open-cycle>Criar ciclo <span>＋</span></button></div>{% endif %}
+      <header class="ca-dashboard-heading">
+        <div><span class="eyebrow">HISTÓRICO DE PLANEJAMENTO</span>
+          <h1>Ciclos organizacionais</h1>
+          <p>Defina os períodos que orientam a avaliação e os objetivos da organização.</p>
+        </div>
+      </header>
+      {% if cycles %}<div class="ca-cycle-list">{% for item in cycles %}<article
+          class="ca-cycle-row{% if cycle and item.id == cycle.id %} current{% endif %}">
+          <div class="ca-cycle-mark">{{ item.year|stringformat:'s'|slice:'-2:' }}</div>
+          <div class="ca-cycle-info">
+            <h4>{{ item.name }} <span>{{ item.year }}</span></h4>
+            <p>{{ item.start_date|date:'d/m/Y' }} a {{ item.end_date|date:'d/m/Y' }}</p>
+          </div><span class="cycle-status ca-status-{{ item.status }}">● {{ item.get_status_display }}</span><button
+            class="button" type="button" data-open-cycle-detail="{{ item.id }}">Abrir ciclo <span>↗</span></button>
+        </article>{% endfor %}</div>{% else %}<div class="ca-empty-state ca-dashboard-empty">
+        <div class="ca-empty-symbol">◎</div><span class="eyebrow">PRIMEIRA DEFINIÇÃO</span>
+        <h2>Nenhum ciclo criado</h2>
+        <p>Crie o primeiro ciclo para iniciar o planejamento estratégico da organização.</p><button
+          class="button primary" type="button" data-open-cycle>Criar ciclo <span>＋</span></button>
+      </div>{% endif %}
     </section>
-    {% if cycle %}<section class="ca-cycle-strip"><div><span class="eyebrow">CICLO EM ACOMPANHAMENTO</span><h2>{{ cycle.name }} <span>{{ cycle.year }}</span></h2><p>{{ cycle.start_date|date:'d/m/Y' }} a {{ cycle.end_date|date:'d/m/Y' }}</p></div><a class="button primary" href="{% url 'cycle_detail' cycle.id %}">Abrir workspace <span>↗</span></a></section><div class="stats ca-stats"><div class="stat-card"><div class="stat-label">Objetivos organizacionais</div><div class="stat-number">{{ objectives_count }}</div><div class="stat-meta">Definidos neste ciclo</div></div><div class="stat-card"><div class="stat-label">Avaliações no ciclo</div><div class="stat-number">{{ total_evaluations }}</div><div class="stat-meta">Visão consolidada</div></div><div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-number">{{ pending_count }}</div><div class="stat-meta">Aguardando andamento</div></div><div class="stat-card"><div class="stat-label">Validadas</div><div class="stat-number">{{ validated_count }}</div><div class="stat-meta">Resultados consolidados</div></div></div>{% endif %}
+    {% if cycle %}<section class="ca-cycle-strip">
+      <div><span class="eyebrow">CICLO EM ACOMPANHAMENTO</span>
+        <h2>{{ cycle.name }} <span>{{ cycle.year }}</span></h2>
+        <p>{{ cycle.start_date|date:'d/m/Y' }} a {{ cycle.end_date|date:'d/m/Y' }}</p>
+      </div><a class="button primary" href="{% url 'cycle_detail' cycle.id %}">Abrir workspace <span>↗</span></a>
+    </section>
+    <div class="stats ca-stats">
+      <div class="stat-card">
+        <div class="stat-label">Objetivos organizacionais</div>
+        <div class="stat-number">{{ objectives_count }}</div>
+        <div class="stat-meta">Definidos neste ciclo</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avaliações no ciclo</div>
+        <div class="stat-number">{{ total_evaluations }}</div>
+        <div class="stat-meta">Visão consolidada</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pendentes</div>
+        <div class="stat-number">{{ pending_count }}</div>
+        <div class="stat-meta">Aguardando andamento</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Validadas</div>
+        <div class="stat-number">{{ validated_count }}</div>
+        <div class="stat-meta">Resultados consolidados</div>
+      </div>
+    </div>{% endif %}
   </main>
 </div>
-{% for item in cycles %}<div class="ca-modal" data-cycle-detail-modal="{{ item.id }}" aria-hidden="true"><div class="ca-modal-backdrop" data-close-cycle-detail></div><section class="ca-modal-card ca-cycle-detail-modal" role="dialog" aria-modal="true" aria-labelledby="cycle-detail-title-{{ item.id }}"><div class="ca-modal-header"><div><span class="eyebrow">REGISTRO DO CICLO</span><h2 id="cycle-detail-title-{{ item.id }}">{{ item.name }}</h2></div><button class="ca-modal-close" type="button" data-close-cycle-detail aria-label="Fechar">×</button></div><div class="ca-cycle-detail-summary"><div><span>ANO</span><strong>{{ item.year }}</strong></div><div><span>INÍCIO</span><strong>{{ item.start_date|date:'d/m/Y' }}</strong></div><div><span>ENCERRAMENTO</span><strong>{{ item.end_date|date:'d/m/Y' }}</strong></div><div><span>STATUS</span><strong>{{ item.get_status_display }}</strong></div></div><div class="ca-cycle-detail-actions"><a class="button" href="{% url 'cycle_detail' item.id %}">Ver workspace <span>↗</span></a><button class="button primary" type="button" data-edit-cycle="{{ item.id }}">Editar registro</button><form method="post" action="{% url 'cycle_delete' item.id %}" onsubmit="return confirm('Eliminar este ciclo e todos os seus registros?');">{% csrf_token %}<button class="button ca-delete-button" type="submit">Eliminar ciclo</button></form></div><div class="ca-inline-edit" data-edit-panel="{{ item.id }}" hidden><div class="ca-inline-edit-heading"><span class="eyebrow">EDIÇÃO DO REGISTRO</span><strong>Atualizar informações</strong></div><form method="post" action="{% url 'cycle_edit' item.id %}">{% csrf_token %}<div class="form-grid"><label>Nome do ciclo<input type="text" name="name" value="{{ item.name }}" required></label><label>Ano<input type="number" name="year" min="2000" max="2100" value="{{ item.year }}" required></label><label>Data de início<input type="date" name="start_date" value="{{ item.start_date|date:'Y-m-d' }}" required></label><label>Data de encerramento<input type="date" name="end_date" value="{{ item.end_date|date:'Y-m-d' }}" required></label><label>Status<select name="status"><option value="planned" {% if item.status == 'planned' %}selected{% endif %}>Planejado</option><option value="active" {% if item.status == 'active' %}selected{% endif %}>Em andamento</option><option value="closed" {% if item.status == 'closed' %}selected{% endif %}>Encerrado</option></select></label></div><div class="form-actions"><button class="button" type="button" data-cancel-edit="{{ item.id }}">Cancelar edição</button><button class="button primary" type="submit">Guardar alterações <span>→</span></button></div></form></div></section></div>{% endfor %}
-<div class="ca-modal" data-cycle-modal aria-hidden="true"><div class="ca-modal-backdrop" data-close-cycle></div><section class="ca-modal-card" role="dialog" aria-modal="true" aria-labelledby="cycle-modal-title"><div class="ca-modal-header"><div><span class="eyebrow">DEFINIÇÃO ESTRATÉGICA</span><h2 id="cycle-modal-title">Novo ciclo organizacional</h2></div><button class="ca-modal-close" type="button" data-close-cycle aria-label="Fechar">×</button></div><p class="heading-note">Defina o período que será conduzido pelo Conselho de Administração.</p>{% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}<form method="post" action="{% url 'cycle_create' %}">{% csrf_token %}<div class="form-grid"><label>Nome do ciclo<input type="text" name="name" placeholder="Ex.: Ciclo de Desempenho" required></label><label>Ano<input type="number" name="year" min="2000" max="2100" placeholder="2026" required></label><label>Data de início<input type="date" name="start_date" required></label><label>Data de encerramento<input type="date" name="end_date" required></label><label>Status inicial<select name="status"><option value="planned">Planejado</option><option value="active">Em andamento</option></select></label></div><div class="form-actions"><button class="button" type="button" data-close-cycle>Cancelar</button><button class="button primary" type="submit">Criar ciclo <span>→</span></button></div></form></section></div>
+{% for item in cycles %}<div class="ca-modal" data-cycle-detail-modal="{{ item.id }}" aria-hidden="true">
+  <div class="ca-modal-backdrop" data-close-cycle-detail></div>
+  <section class="ca-modal-card ca-cycle-detail-modal" role="dialog" aria-modal="true"
+    aria-labelledby="cycle-detail-title-{{ item.id }}">
+    <div class="ca-modal-header">
+      <div><span class="eyebrow">REGISTRO DO CICLO</span>
+        <h2 id="cycle-detail-title-{{ item.id }}">{{ item.name }}</h2>
+      </div><button class="ca-modal-close" type="button" data-close-cycle-detail aria-label="Fechar">×</button>
+    </div>
+    <div class="ca-cycle-detail-summary">
+      <div><span>ANO</span><strong>{{ item.year }}</strong></div>
+      <div><span>INÍCIO</span><strong>{{ item.start_date|date:'d/m/Y' }}</strong></div>
+      <div><span>ENCERRAMENTO</span><strong>{{ item.end_date|date:'d/m/Y' }}</strong></div>
+      <div><span>STATUS</span><strong>{{ item.get_status_display }}</strong></div>
+    </div>
+    <div class="ca-cycle-detail-actions"><a class="button" href="{% url 'cycle_detail' item.id %}">Ver workspace
+        <span>↗</span></a><button class="button primary" type="button" data-edit-cycle="{{ item.id }}">Editar
+        registro</button>
+      <form method="post" action="{% url 'cycle_delete' item.id %}"
+        onsubmit="return confirm('Eliminar este ciclo e todos os seus registros?');">{% csrf_token %}<button
+          class="button ca-delete-button" type="submit">Eliminar ciclo</button></form>
+    </div>
+    <div class="ca-inline-edit" data-edit-panel="{{ item.id }}" hidden>
+      <div class="ca-inline-edit-heading"><span class="eyebrow">EDIÇÃO DO REGISTRO</span><strong>Atualizar
+          informações</strong></div>
+      <form method="post" action="{% url 'cycle_edit' item.id %}">{% csrf_token %}<div class="form-grid"><label>Nome do
+            ciclo<input type="text" name="name" value="{{ item.name }}" required></label><label>Ano<input type="number"
+              name="year" min="2000" max="2100" value="{{ item.year }}" required></label><label>Data de início<input
+              type="date" name="start_date" value="{{ item.start_date|date:'Y-m-d' }}" required></label><label>Data de
+            encerramento<input type="date" name="end_date" value="{{ item.end_date|date:'Y-m-d' }}"
+              required></label><label>Status<select name="status">
+              <option value="planned" {% if item.status == 'planned' %}selected{% endif %}>Planejado</option>
+              <option value="active" {% if item.status == 'active' %}selected{% endif %}>Em andamento</option>
+              <option value="closed" {% if item.status == 'closed' %}selected{% endif %}>Encerrado</option>
+            </select></label></div>
+        <div class="form-actions"><button class="button" type="button" data-cancel-edit="{{ item.id }}">Cancelar
+            edição</button><button class="button primary" type="submit">Guardar alterações <span>→</span></button></div>
+      </form>
+    </div>
+  </section>
+</div>{% endfor %}
+<div class="ca-modal" data-cycle-modal aria-hidden="true">
+  <div class="ca-modal-backdrop" data-close-cycle></div>
+  <section class="ca-modal-card" role="dialog" aria-modal="true" aria-labelledby="cycle-modal-title">
+    <div class="ca-modal-header">
+      <div><span class="eyebrow">DEFINIÇÃO ESTRATÉGICA</span>
+        <h2 id="cycle-modal-title">Novo ciclo organizacional</h2>
+      </div><button class="ca-modal-close" type="button" data-close-cycle aria-label="Fechar">×</button>
+    </div>
+    <p class="heading-note">Defina o período que será conduzido pelo Conselho de Administração.</p>{% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}<form method="post"
+      action="{% url 'cycle_create' %}">{% csrf_token %}<div class="form-grid"><label>Nome do ciclo<input type="text"
+            name="name" placeholder="Ex.: Ciclo de Desempenho" required></label><label>Ano<input type="number"
+            name="year" min="2000" max="2100" placeholder="2026" required></label><label>Data de início<input
+            type="date" name="start_date" required></label><label>Data de encerramento<input type="date" name="end_date"
+            required></label><label>Status inicial<select name="status">
+            <option value="planned">Planejado</option>
+            <option value="active">Em andamento</option>
+          </select></label></div>
+      <div class="form-actions"><button class="button" type="button" data-close-cycle>Cancelar</button><button
+          class="button primary" type="submit">Criar ciclo <span>→</span></button></div>
+    </form>
+  </section>
+</div>
 <script>
   (function () {
     var modal = document.querySelector('[data-cycle-modal]');

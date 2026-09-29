@@ -1,0 +1,8 @@
+.institutional-status-chart .status-donut{background:conic-gradient(#23836b 0 var(--completed),#e8edf2 var(--completed) 100%)}
+.institutional-status-chart .legend-active{background:#d7e0e8}
+.institutional-status-chart .legend-completed{background:#23836b}
+.departmental-status-chart .status-donut{background:conic-gradient(#23836b 0 var(--completed),#e8edf2 var(--completed) 100%)}
+.departmental-status-chart .legend-active{background:#d7e0e8}
+.departmental-status-chart .legend-completed{background:#23836b}
+.rh-dashboard-content .dashboard-institutional-grid .legend-active{background:#d7e0e8}
+.rh-dashboard-content .dashboard-institutional-grid .legend-completed{background:#23836b}

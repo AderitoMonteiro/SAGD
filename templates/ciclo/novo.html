@@ -5,7 +5,6 @@
   {% include 'includes/management_sidebar.html' with active_menu='cycles' %}
 
   <div id="spa-content"{% if read_only %} class="is-read-only"{% endif %}>
-  {% if read_only %}<style>#spa-content.is-read-only [data-open-cycle-modal="create"],#spa-content.is-read-only [data-open-cycle-modal^="toggle-"],#spa-content.is-read-only [data-open-cycle-modal^="edit-"],#spa-content.is-read-only [data-open-cycle-modal^="delete-"],#spa-content.is-read-only [data-switch-cycle-modal]{display:none!important}</style>{% endif %}
   <main class="main cycle-main">
     <div class="topbar">
       <div class="breadcrumb">SAGD <span>/</span> <strong>{% if read_only %}Ciclos existentes{% else %}Criar novo ciclo{% endif %}</strong></div>

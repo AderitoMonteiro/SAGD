@@ -22,12 +22,15 @@
   {% elif is_manager_user %}
     <div class="nav-label">Gestor</div>
     <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Painel estratégico</span></a>
-    <div class="nav-label" style="margin-top:27px">Objetivos</div>
-    <a class="nav-link{% if active_menu == 'departmental' %} active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Departamentais</span></a>
-    <a class="nav-link{% if active_menu == 'individual' %} active{% endif %}" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Individuais</span></a>
+    <div class="nav-label" style="margin-top:27px">Planeamento</div>
+    <a class="nav-link{% if active_menu == 'departmental' %} active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivo do Departamento</span></a>
+    <a class="nav-link{% if active_menu == 'individual' %} active{% endif %}" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos Individuais</span></a>
     <div class="nav-label" style="margin-top:27px">Consulta</div>
     <a class="nav-link{% if active_menu == 'cycles' %} active{% endif %}" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
     <a class="nav-link{% if active_menu == 'institutional' %} active{% endif %}" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
+  {% elif has_no_group_user %}
+    <div class="nav-label">Acesso</div>
+    <div class="sidebar-access-notice">Sem menus disponíveis. Solicite a atribuição de um grupo de acesso.</div>
   {% else %}
     <div class="nav-label">Menu principal</div>
     <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Início</span></a>

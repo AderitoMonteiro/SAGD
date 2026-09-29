@@ -5,7 +5,6 @@
   {% include 'includes/management_sidebar.html' with active_menu='individual' %}
 
   <div id="spa-content"{% if read_only %} class="is-read-only"{% endif %}>
-    {% if read_only %}<style>#spa-content.is-read-only [data-open-individual-modal],#spa-content.is-read-only [data-switch-individual-modal]{display:none!important}#spa-content.is-read-only [data-open-individual-modal^="view-"]{display:inline-flex!important}</style>{% endif %}
     <main class="main">
       <div class="topbar"><div class="breadcrumb">SAGD <span>/</span> <strong>Objetivos individuais</strong></div></div>
       <div class="objective-content">

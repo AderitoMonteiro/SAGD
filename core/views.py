@@ -86,7 +86,8 @@ def is_manager(user):
 
 def can_manage_operational_objectives(user):
     return user.is_authenticated and (
-        user.is_superuser or user.groups.filter(name='Administrador').exists()
+        user.is_superuser
+        or user.groups.filter(name__in=['Administrador', 'Gestor']).exists()
     )
 
 
@@ -152,6 +153,48 @@ def get_current_cycle_monthly_progress(cycle):
 
     objectives = list(DepartmentObjective.objects.filter(
         institutional_objective__cycle=cycle
+    ).select_related('domain').only('status', 'date_update', 'domain__type'))
+    total = len(objectives)
+    today = timezone.localdate()
+    last_date = min(today, cycle.end_date)
+    if last_date < cycle.start_date:
+        return [], ''
+
+    month_names = ('Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez')
+    cursor = date(cycle.start_date.year, cycle.start_date.month, 1)
+    progress = []
+    while cursor <= last_date:
+        month_end = date(cursor.year, cursor.month, calendar.monthrange(cursor.year, cursor.month)[1])
+        reference_date = min(month_end, last_date)
+        completed = sum(
+            objective.automatic_status == 'completed' and objective.date_update.date() <= reference_date
+            for objective in objectives
+        )
+        progress.append({
+            'label': f'{month_names[cursor.month - 1]} {cursor.year}',
+            'month': month_names[cursor.month - 1],
+            'total': total,
+            'completed': completed,
+            'percentage': round(completed * 100 / total) if total else 0,
+        })
+        cursor = date(cursor.year + (cursor.month == 12), (cursor.month % 12) + 1, 1)
+
+    # Coordenadas para o gráfico SVG: margem horizontal de 48 a 760 e eixo Y de 172 a 42.
+    count = len(progress)
+    for index, item in enumerate(progress):
+        item['svg_x'] = 404 if count == 1 else round(48 + index * 712 / (count - 1))
+        item['svg_y'] = 172 - round(item['percentage'] * 1.3)
+    points = ' '.join(f"{item['svg_x']},{item['svg_y']}" for item in progress)
+    return progress, points
+
+
+def get_institutional_cycle_monthly_progress(cycle):
+    """Evolução mensal acumulada dos objetivos institucionais concluídos."""
+    if not cycle:
+        return [], ''
+
+    objectives = list(InstitutionalObjective.objects.filter(
+        cycle=cycle
     ).only('status', 'date_update'))
     total = len(objectives)
     today = timezone.localdate()
@@ -178,7 +221,6 @@ def get_current_cycle_monthly_progress(cycle):
         })
         cursor = date(cursor.year + (cursor.month == 12), (cursor.month % 12) + 1, 1)
 
-    # Coordenadas para o gráfico SVG: margem horizontal de 48 a 760 e eixo Y de 172 a 42.
     count = len(progress)
     for index, item in enumerate(progress):
         item['svg_x'] = 404 if count == 1 else round(48 + index * 712 / (count - 1))
@@ -195,7 +237,7 @@ def get_manager_monthly_progress(cycle, department):
     objectives = list(IndividualObjective.objects.filter(
         department_objective__department=department,
         department_objective__institutional_objective__cycle=cycle,
-    ).only('status', 'date_update'))
+    ).select_related('domain').only('status', 'date_update', 'domain__type'))
     total = len(objectives)
     today = timezone.localdate()
     last_date = min(today, cycle.end_date)
@@ -209,7 +251,7 @@ def get_manager_monthly_progress(cycle, department):
         month_end = date(cursor.year, cursor.month, calendar.monthrange(cursor.year, cursor.month)[1])
         reference_date = min(month_end, last_date)
         completed = sum(
-            objective.status == 'completed' and objective.date_update.date() <= reference_date
+            objective.automatic_status == 'completed' and objective.date_update.date() <= reference_date
             for objective in objectives
         )
         progress.append({
@@ -254,7 +296,7 @@ def planning_required(view):
 
 
 def objective_write_required(view):
-    """Apenas gestores podem alterar objetivos departamentais e individuais."""
+    """Permite gerir objetivos departamentais e individuais aos perfis autorizados."""
     @login_required
     def wrapped(request, *args, **kwargs):
         if not can_manage_operational_objectives(request.user):
@@ -355,7 +397,7 @@ def menu_home(request):
             InstitutionalObjective.objects.select_related('cycle', 'domain')
             .order_by('-date_created')
         )
-        institutional_dashboard_objectives = institutional_objective_list[:5]
+        institutional_dashboard_objectives = institutional_objective_list[:3]
         institutional_active_count = sum(
             item.automatic_status == 'active'
             for item in institutional_objective_list
@@ -397,7 +439,7 @@ def menu_home(request):
             'institutional_active_count': institutional_active_count,
             'institutional_completed_count': institutional_completed_count,
             'institutional_active_percentage': round(
-                institutional_active_count * 100 / institutional_total
+                institutional_completed_count * 100 / institutional_total
             ) if institutional_total else 0,
             'monthly_completion_progress': monthly_completion_progress,
             'monthly_completion_points': monthly_completion_points,
@@ -415,8 +457,15 @@ def menu_home(request):
         item.automatic_status == 'completed' for item in institutional_objectives
     )
     institutional_total = institutional_active_count + institutional_completed_count
-    active_objectives_count = sum(item.automatic_status == 'active' for item in InstitutionalObjective.objects.all()) + sum(item.automatic_status == 'active' for item in DepartmentObjective.objects.all()) + sum(item.automatic_status == 'active' for item in IndividualObjective.objects.all())
-    completed_objectives_count = sum(item.automatic_status == 'completed' for item in InstitutionalObjective.objects.all()) + sum(item.automatic_status == 'completed' for item in DepartmentObjective.objects.all()) + sum(item.automatic_status == 'completed' for item in IndividualObjective.objects.all())
+    department_objectives = list(
+        DepartmentObjective.objects.select_related('institutional_objective', 'domain')
+    )
+    active_objectives_count = sum(
+        item.automatic_status == 'active' for item in department_objectives
+    )
+    completed_objectives_count = sum(
+        item.automatic_status == 'completed' for item in department_objectives
+    )
     objective_total = active_objectives_count + completed_objectives_count
     level_chart = [
         {'label': 'Institucionais', 'value': InstitutionalObjective.objects.count(), 'color': 'institutional'},
@@ -446,19 +495,22 @@ def menu_home(request):
         if item['department_objective_count']
     ]
     monthly_completion_progress, monthly_completion_points = (
-        get_current_cycle_monthly_progress(active_cycle)
+        get_institutional_cycle_monthly_progress(active_cycle)
         if is_council(request.user) else ([], '')
     )
     context = {
         'cycles_count': cycles.count(),
         'active_cycle': active_cycle,
         'institutional_count': InstitutionalObjective.objects.count(),
-        'institutional_dashboard_objectives': institutional_objectives[:5],
+        'institutional_dashboard_objectives': institutional_objectives[:3],
         'institutional_active_count': institutional_active_count,
         'institutional_completed_count': institutional_completed_count,
         'institutional_total': institutional_total,
         'institutional_active_percentage': round(
             institutional_active_count * 100 / institutional_total
+        ) if institutional_total else 0,
+        'institutional_completed_percentage': round(
+            institutional_completed_count * 100 / institutional_total
         ) if institutional_total else 0,
         'departmental_count': DepartmentObjective.objects.count(),
         'individual_count': IndividualObjective.objects.count(),

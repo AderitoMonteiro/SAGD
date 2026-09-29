@@ -1,0 +1,5 @@
+/* Estado consistente em todas as listagens: em andamento azul, concluído verde. */
+.objective-status-active{color:#416b9b;background:#dbe5f1}
+.objective-status-completed{color:#176b57;background:#dff4ec}
+.ca-status-active,.cycle-record-status.ca-status-active{color:#416b9b;background:#dbe5f1}
+.ca-status-closed,.cycle-record-status.ca-status-closed{color:#176b57;background:#dff4ec}
