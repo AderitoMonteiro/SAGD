@@ -18,7 +18,7 @@
         <a href="{% url 'planejamento_objetivo_departamental_create' objetivo.id %}">↳ Departamental</a>
         {% for departamental in objetivo.department_objectives.all %}
           <span class="planning-menu-parent">{{ departamental.description|truncatechars:22 }}</span>
-          <a href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">↳ Individual</a>
+          {% if departamental.is_approved %}<a href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">↳ Individual</a>{% endif %}
         {% endfor %}
       {% endfor %}
     </details>
@@ -107,7 +107,7 @@
                   <span class="eyebrow">INDIVIDUAIS</span>
                   <h5>Objetivos individuais</h5>
                 </div>
-                <a class="button" href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">Adicionar individual <span>＋</span></a>
+                {% if departamental.is_approved %}<a class="button" href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">Adicionar individual <span>＋</span></a>{% endif %}
               </div>
 
               {% for individual in departamental.individual_objectives.all %}

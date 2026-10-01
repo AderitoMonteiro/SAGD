@@ -6,19 +6,19 @@
     <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}"><span class="nav-icon">⌂</span><span>Painel estratégico</span></a>
     <div class="nav-label" style="margin-top:27px">Planejamento</div>
     <a class="nav-link{% if active_menu == 'cycles' %} active{% endif %}" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
-    <div class="nav-label" style="margin-top:27px">Consulta</div>
     <a class="nav-link{% if active_menu == 'institutional' %} active{% endif %}" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
+    <div class="nav-label" style="margin-top:27px">Consulta</div>
     <a class="nav-link{% if active_menu == 'departmental' %} active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
     <a class="nav-link{% if active_menu == 'individual' %} active{% endif %}" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
   {% elif is_hr_user %}
   <div class="nav-label">Recursos Humanos</div>
   <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Painel de controlo</span></a>
   <div class="nav-label" style="margin-top:27px">Planejamento</div>
-  <a class="nav-link{% if active_menu == 'institutional' %} active{% endif %}" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
-  <div class="nav-label" style="margin-top:27px">Consulta</div>
-  <a class="nav-link{% if active_menu == 'cycles' %} active{% endif %}" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
   <a class="nav-link{% if active_menu == 'departmental' %} active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link><span class="nav-icon">◈</span><span>Objetivos departamentais</span></a>
   <a class="nav-link{% if active_menu == 'individual' %} active{% endif %}" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link><span class="nav-icon">◇</span><span>Objetivos individuais</span></a>
+  <div class="nav-label" style="margin-top:27px">Consulta</div>
+  <a class="nav-link{% if active_menu == 'cycles' %} active{% endif %}" href="{% url 'planejamento_ciclo_create' %}" data-spa-link><span class="nav-icon">◷</span><span>Ciclos</span></a>
+  <a class="nav-link{% if active_menu == 'institutional' %} active{% endif %}" href="{% url 'planejamento_objetivo_institucional_menu' %}" data-spa-link><span class="nav-icon">◎</span><span>Objetivos institucionais</span></a>
   {% elif is_manager_user %}
     <div class="nav-label">Gestor</div>
     <a class="nav-link{% if active_menu == 'home' %} active{% endif %}" href="{% url 'menu_home' %}" data-spa-link><span class="nav-icon">⌂</span><span>Painel estratégico</span></a>

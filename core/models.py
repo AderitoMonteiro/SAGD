@@ -221,6 +221,38 @@ class UserDepartment(models.Model):
         return f'{self.user} - {self.department or "Sem departamento"}'
 
 
+class AprovacaoTarefa(models.Model):
+    obs = models.CharField('observação', max_length=200)
+    department_objective = models.ForeignKey(
+        'DepartmentObjective',
+        db_column='objetivo_departtamento_id',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='approval_history',
+        verbose_name='objetivo departamental',
+    )
+    domain = models.ForeignKey(
+        'Domain',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='aprovacoes_tarefas',
+        verbose_name='domínio',
+    )
+    date_created = models.DateTimeField('data de criação', auto_now_add=True)
+    date_update = models.DateTimeField('data de atualização', auto_now=True)
+
+    class Meta:
+        db_table = 'aprovacao_tarefas'
+        ordering = ['-date_created', '-id']
+        verbose_name = 'aprovação de tarefa'
+        verbose_name_plural = 'aprovações de tarefas'
+
+    def __str__(self):
+        return self.obs
+
+
 class DepartmentObjective(models.Model):
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     institutional_objective = models.ForeignKey(InstitutionalObjective, on_delete=models.CASCADE, related_name='department_objectives')
@@ -266,6 +298,64 @@ class DepartmentObjective(models.Model):
     @property
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
+
+    @property
+    def approval_status(self):
+        approval = self.latest_approval
+        if not approval or not approval.domain_id:
+            return 'pending_approval'
+        approval_description = approval.domain.description.strip().casefold()
+        if approval_description == 'aprovado':
+            return 'approved'
+        if approval_description == 'rejeitado':
+            return 'rejected'
+        return 'pending_approval'
+
+    @property
+    def listing_status(self):
+        if self.approval_status == 'pending_approval':
+            return 'pending-approval'
+        if self.approval_status == 'rejected':
+            return 'rejected'
+        return self.automatic_status
+
+    @property
+    def listing_status_display(self):
+        if self.approval_status == 'pending_approval':
+            return 'Por aprovar'
+        if self.approval_status == 'rejected':
+            return 'Rejeitado'
+        return self.automatic_status_display
+
+    @property
+    def can_be_edited(self):
+        return self.automatic_status != 'completed' or self.approval_status == 'rejected'
+
+    @property
+    def has_admin_feedback(self):
+        return bool(self.approval_comments)
+
+    @property
+    def is_approved(self):
+        return self.approval_status == 'approved'
+
+    @property
+    def approval_entries(self):
+        if not hasattr(self, '_approval_entries_cache'):
+            self._approval_entries_cache = list(self.approval_history.all())
+        return self._approval_entries_cache
+
+    @property
+    def latest_approval(self):
+        return self.approval_entries[0] if self.approval_entries else None
+
+    @property
+    def approval_comments(self):
+        return [
+            entry for entry in self.approval_entries
+            if entry.obs.strip()
+            and not entry.obs.strip().casefold().startswith('aprovado por ')
+        ]
 
 
 class IndividualObjective(models.Model):

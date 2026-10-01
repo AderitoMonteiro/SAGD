@@ -1,0 +1,29 @@
+.objective-status-pending-approval{color:#896719;background:#fff4d9}
+.objective-status-rejected{color:#a44738;background:#fff0ed}
+.department-approval-actions{align-items:center}
+.department-approval-actions form{margin:0}
+.form-actions .button.department-reject-button{color:#fff!important;background:#c4473a!important;border:1px solid #c4473a!important}
+.form-actions .button.department-reject-button:hover{color:#fff!important;background:#a9362b!important;border-color:#a9362b!important}
+.form-actions .button.department-approve-button{color:#fff!important;background:#23836b!important;border:1px solid #23836b!important}
+.form-actions .button.department-approve-button:hover{color:#fff!important;background:#176d57!important;border-color:#176d57!important}
+#spa-content.is-read-only [data-switch-department-modal^="reject-"],#spa-content.is-read-only [data-switch-department-modal^="approve-"],#spa-content.is-read-only [data-department-modal^="reject-"] [data-switch-department-modal^="view-"],#spa-content.is-read-only [data-department-modal^="approve-"] [data-switch-department-modal^="view-"]{display:inline-flex!important}
+.department-rejection-reason{display:flex;flex-direction:column;gap:8px;color:#082e5c;font-weight:700}
+.department-approval-comment,.department-rejection-reason{display:flex;flex-direction:column;gap:8px;color:#082e5c;font-weight:700}
+.department-approval-comment>span{color:#71809b;font-size:11px;font-weight:500}
+.department-approval-comment textarea,.department-rejection-reason textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:120px;padding:12px 14px;border:1px solid #cbd8e6;border-radius:8px;color:#082e5c;font:inherit;font-weight:400;background:#fff}
+.department-approval-comment textarea:focus{outline:2px solid rgba(35,131,107,.2);border-color:#23836b}
+.department-rejection-reason textarea:focus{outline:2px solid rgba(196,71,58,.2);border-color:#c4473a}
+.department-approval-comment small,.department-rejection-reason small{color:#71809b;font-weight:400}
+.department-approval-feedback{margin:20px 0;padding:16px 18px;border-left:4px solid #c9433a;border-radius:8px;background:#fff4f2}
+.department-approval-feedback span{display:block;margin-bottom:7px;color:#a9362b;font-size:10px;font-weight:800;letter-spacing:1.1px}
+.department-approval-feedback p{margin:0;color:#573632;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.department-approval-feedback-approved{border-left-color:#23836b;background:#eff9f5}
+.department-approval-feedback-approved span{color:#176d57}
+.department-approval-feedback-approved p{color:#244c43}
+.department-approval-history{display:grid;gap:10px;margin:20px 0}
+.department-approval-history .department-approval-feedback{margin:0}
+.department-approval-history-title{color:#71809b;font-size:10px;font-weight:800;letter-spacing:1.1px}
+.objective-record-has-feedback{margin:0 -12px;padding-right:12px;padding-left:12px;border-radius:9px;background:#fffaf0;box-shadow:inset 4px 0 0 #e2a93b}
+.department-feedback-indicator{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:20px;background:#fff0cf;color:#8a5b08;font-size:10px;font-weight:700;white-space:nowrap}
+.department-feedback-indicator>span{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#d99720;color:#fff;font-size:10px}
+@media(max-width:720px){.department-feedback-indicator{margin-left:56px}}

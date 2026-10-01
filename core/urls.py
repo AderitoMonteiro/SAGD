@@ -25,6 +25,7 @@ urlpatterns = [
     path('planejamento/objetivos-departamentais/<int:objetivo_id>/editar/', views.planejamento_objetivo_departamental_edit, name='planejamento_objetivo_departamental_edit'),
     path('planejamento/objetivos-departamentais/<int:objetivo_id>/excluir/', views.planejamento_objetivo_departamental_delete, name='planejamento_objetivo_departamental_delete'),
     path('planejamento/objetivos-departamentais/<int:objetivo_id>/estado/', views.planejamento_objetivo_departamental_toggle_status, name='planejamento_objetivo_departamental_toggle_status'),
+    path('planejamento/objetivos-departamentais/<int:objetivo_id>/aprovacao/', views.planejamento_objetivo_departamental_aprovacao, name='planejamento_objetivo_departamental_aprovacao'),
     path('planejamento/objetivos-departamentais/<int:objetivo_id>/individuais/novo/', views.planejamento_objetivo_individual_create, name='planejamento_objetivo_individual_create'),
     path('planejamento/objetivos-individuais/<int:objetivo_id>/editar/', views.planejamento_objetivo_individual_edit, name='planejamento_objetivo_individual_edit'),
     path('planejamento/objetivos-individuais/<int:objetivo_id>/excluir/', views.planejamento_objetivo_individual_delete, name='planejamento_objetivo_individual_delete'),
