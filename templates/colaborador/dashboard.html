@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Minhas tarefas | SAGD{% endblock %}
+{% block body %}
+<div class="app-shell collaborator-page">
+  {% include 'includes/management_sidebar.html' with active_menu='tasks' %}
+  <div id="spa-content">
+    <main class="main">
+      <div class="topbar"><div class="breadcrumb">SAGD <span>/</span> <strong>Minhas tarefas</strong></div></div>
+      <div class="collaborator-content">
+        <section class="collaborator-heading">
+          <div><span class="eyebrow">ACOMPANHAMENTO INDIVIDUAL</span><h1>Minhas tarefas</h1><p>Consulte e dê seguimento às tarefas atribuídas no seu departamento.</p></div>
+          <div class="collaborator-department"><small>DEPARTAMENTO</small><strong>{{ collaborator_department.name|default:'Não associado' }}</strong></div>
+        </section>
+        <section class="collaborator-stats">
+          <article><span>◇</span><div><strong>{{ task_total }}</strong><small>Total de tarefas</small></div></article>
+          <article><span>◷</span><div><strong>{{ pending_total }}</strong><small>Tarefas pendentes</small></div></article>
+          <article><span>✓</span><div><strong>{{ completed_total }}</strong><small>Tarefas concluídas</small></div></article>
+        </section>
+        <section class="collaborator-task-panel">
+          <header><div><span class="eyebrow">ACOMPANHAMENTO</span><h2>{% if task_filter == 'active' %}Tarefas em andamento{% elif task_filter == 'completed' %}Tarefas concluídas{% else %}Todas as tarefas{% endif %}</h2></div><nav class="collaborator-task-filters" aria-label="Filtrar tarefas"><a class="{% if task_filter == 'all' %}active{% endif %}" href="{% url 'menu_home' %}?status=all" data-spa-link>Todas <strong>{{ task_total }}</strong></a><a class="{% if task_filter == 'active' %}active{% endif %}" href="{% url 'menu_home' %}?status=active" data-spa-link>Em andamento <strong>{{ pending_total }}</strong></a><a class="{% if task_filter == 'completed' %}active{% endif %}" href="{% url 'menu_home' %}?status=completed" data-spa-link>Concluídas <strong>{{ completed_total }}</strong></a></nav></header>
+          <div class="collaborator-task-list">
+            {% for task in tasks %}
+              <article class="collaborator-task-card{% if task.automatic_status == 'completed' %} is-completed{% endif %}">
+                <div class="collaborator-task-main">
+                  <div class="collaborator-task-icon">◇</div>
+                  <div><h3>{{ task.description }}</h3><p>Objetivo departamental: {{ task.department_objective.description|truncatechars:85 }}</p><div class="collaborator-task-dates"><span>Início <strong>{{ task.start_date|date:'d/m/Y'|default:'—' }}</strong></span><span>Fim <strong>{{ task.end_date|date:'d/m/Y'|default:'—' }}</strong></span>{% if task.automatic_status != 'completed' %}<span class="individual-schedule-flag individual-schedule-flag-{{ task.schedule_flag }}">{{ task.schedule_flag_display }}</span>{% endif %}</div></div>
+                </div>
+                <div class="collaborator-task-action">
+                  <span class="objective-status objective-status-{{ task.automatic_status }}">{{ task.automatic_status_display }}</span>
+                  {% if task.automatic_status != 'completed' %}<form method="post" action="{% url 'colaborador_tarefa_atualizar' task.id %}">{% csrf_token %}{% if task.status == 'draft' %}<input type="hidden" name="action" value="start"><button class="button primary" type="submit">Iniciar tarefa</button>{% else %}<input type="hidden" name="action" value="complete"><button class="button collaborator-complete-button" type="submit">Concluir tarefa</button>{% endif %}</form>{% endif %}
+                </div>
+                {% with occurrences=task.occurrence_records.all %}<details class="task-occurrences">
+                  <summary>Ocorrências <strong>{{ occurrences|length }}</strong><span>Consultar histórico</span></summary>
+                  <div class="task-occurrence-content">
+                    {% if task.can_register_occurrence %}<form class="task-occurrence-form" method="post" action="{% url 'colaborador_ocorrencia_criar' task.id %}">{% csrf_token %}<label>Registar nova ocorrência<textarea name="description" rows="3" maxlength="200" placeholder="Descreva o acontecimento ou avanço da tarefa" required></textarea></label><button class="button primary" type="submit">Registar ocorrência</button></form>{% elif task.automatic_status != 'completed' %}<p class="task-occurrence-notice">O registo só fica disponível quando a tarefa estiver em andamento e dentro das datas definidas.</p>{% endif %}
+                    <div class="task-occurrence-history">{% for occurrence in occurrences %}<article><div><strong>{{ occurrence.description }}</strong><time datetime="{{ occurrence.date_created|date:'c' }}">{{ occurrence.date_created|date:'d/m/Y H:i' }}</time></div></article>{% empty %}<p>Ainda não existem ocorrências registadas nesta tarefa.</p>{% endfor %}</div>
+                  </div>
+                </details>{% endwith %}
+              </article>
+            {% empty %}
+              <div class="collaborator-empty"><span>✓</span><h2>Nenhuma tarefa encontrada</h2><p>Não existem tarefas para o filtro selecionado.</p></div>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+{% endblock %}

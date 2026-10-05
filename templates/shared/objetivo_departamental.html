@@ -10,6 +10,7 @@
         <a class="cycle-back" href="{% url 'menu_home' %}" data-spa-link>← Voltar ao início</a>
         <section class="objective-list-panel">
           <div class="objective-section-heading"><div><span class="eyebrow">DESDOBRAMENTO ESTRATÉGICO</span><h1>Objetivos departamentais</h1><p>Converta a estratégia institucional em resultados para cada departamento.</p></div><button class="button primary" type="button" data-open-department-modal="create">Novo objetivo <span>＋</span></button></div>
+          {% if is_manager_user %}<nav class="department-objective-filters" aria-label="Filtrar objetivos departamentais"><a class="{% if department_filter == 'all' %}active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}?status=all" data-spa-link>Todos <strong>{{ department_total }}</strong></a><a class="{% if department_filter == 'active' %}active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}?status=active" data-spa-link>Em andamento <strong>{{ department_active_total }}</strong></a><a class="{% if department_filter == 'completed' %}active{% endif %}" href="{% url 'planejamento_objetivo_departamental_menu' %}?status=completed" data-spa-link>Concluídos <strong>{{ department_completed_total }}</strong></a></nav>{% endif %}
           {% if objetivos %}
           <div class="objective-record-list">
             {% for objetivo in objetivos %}

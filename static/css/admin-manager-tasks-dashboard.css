@@ -1,0 +1,17 @@
+.manager-task-dashboard-grid {
+  margin-top: 20px;
+}
+
+.manager-task-dashboard-grid .chart-bar-individual {
+  background: #23836b !important;
+}
+
+.manager-task-dashboard-grid .institutional-dashboard-link {
+  margin-top: 18px;
+}
+
+@media (max-width: 820px) {
+  .manager-task-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

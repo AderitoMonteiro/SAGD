@@ -6,10 +6,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.db.models import OuterRef, Subquery
 from django.utils import timezone
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import (AprovacaoTarefa, Cycle, Department, DepartmentObjective, Domain, Evaluation, FollowUp, IndividualObjective,
-                    InstitutionalObjective, Objective, UserDepartment, Validation)
+                    InstitutionalObjective, Objective, RegistoOcorrencia, UserDepartment, Validation)
 
 
 PHASES = [
@@ -106,6 +107,7 @@ def is_manager(user):
 def can_manage_operational_objectives(user):
     return user.is_authenticated and (
         user.is_superuser
+        or is_council(user)
         or is_hr(user)
         or user.groups.filter(name__in=['Administrador', 'Gestor']).exists()
     )
@@ -163,6 +165,8 @@ def approved_department_objectives_for_user(user, queryset=None):
 
 def individual_objectives_for_user(user, queryset=None):
     queryset = queryset if queryset is not None else IndividualObjective.objects.all()
+    if is_council(user):
+        return queryset.filter(user__groups__name='Gestor').distinct()
     if not is_hr(user):
         return queryset
     department = user_department(user)
@@ -177,6 +181,23 @@ def collaborators_for_user(user, queryset=None):
         return queryset
     department = user_department(user)
     return queryset.filter(department_profile__department=department) if department else queryset.none()
+
+
+def individual_assignees_for_user(user):
+    queryset = get_user_model().objects.filter(is_active=True).select_related(
+        'department_profile__department'
+    ).distinct().order_by('first_name', 'username')
+    if is_council(user):
+        return queryset.filter(groups__name='Gestor')
+    return collaborators_for_user(
+        user,
+        queryset.filter(groups__name='Colaborador'),
+    )
+
+
+def can_receive_individual_objective(planner, assignee):
+    expected_group = 'Gestor' if is_council(planner) else 'Colaborador'
+    return assignee.groups.filter(name=expected_group).exists()
 
 
 def get_department_summaries():
@@ -588,6 +609,37 @@ def menu_home(request):
             'monthly_manager_points': monthly_manager_points,
         })
 
+    if is_collaborator(request.user):
+        collaborator_department = user_department(request.user)
+        tasks = IndividualObjective.objects.select_related(
+            'department_objective__institutional_objective__cycle',
+            'department_objective__department',
+        ).prefetch_related('occurrence_records').filter(user=request.user).order_by('end_date', '-date_created')
+        if collaborator_department:
+            tasks = tasks.filter(department_objective__department=collaborator_department)
+        else:
+            tasks = tasks.none()
+        task_list = list(tasks)
+        pending_tasks = [task for task in task_list if task.automatic_status != 'completed']
+        completed_tasks = [task for task in task_list if task.automatic_status == 'completed']
+        task_filter = request.GET.get('status', 'all')
+        if task_filter not in {'all', 'active', 'completed'}:
+            task_filter = 'all'
+        if task_filter == 'active':
+            filtered_tasks = pending_tasks
+        elif task_filter == 'completed':
+            filtered_tasks = completed_tasks
+        else:
+            filtered_tasks = task_list
+        return render(request, 'colaborador/dashboard.html', {
+            'collaborator_department': collaborator_department,
+            'tasks': filtered_tasks,
+            'task_filter': task_filter,
+            'pending_total': len(pending_tasks),
+            'completed_total': len(completed_tasks),
+            'task_total': len(task_list),
+        })
+
     cycles = Cycle.objects.all()
     active_cycle = next((cycle for cycle in cycles if cycle.automatic_status == 'active'), None)
     institutional_objectives = list(
@@ -637,6 +689,32 @@ def menu_home(request):
         for item in council_department_summaries
         if item['department_objective_count']
     ]
+    manager_tasks = list(
+        IndividualObjective.objects.filter(user__groups__name='Gestor')
+        .select_related('user', 'department_objective__department')
+        .distinct()
+        .order_by('-date_created')
+    ) if is_council(request.user) else []
+    manager_task_total = len(manager_tasks)
+    manager_task_completed = sum(
+        task.automatic_status == 'completed' for task in manager_tasks
+    )
+    manager_task_active = manager_task_total - manager_task_completed
+    manager_task_percentage = round(
+        manager_task_completed * 100 / manager_task_total
+    ) if manager_task_total else 0
+    manager_task_distribution = []
+    manager_ids = {task.user_id for task in manager_tasks}
+    for manager in get_user_model().objects.filter(id__in=manager_ids).order_by('first_name', 'username'):
+        assigned_tasks = [task for task in manager_tasks if task.user_id == manager.id]
+        total = len(assigned_tasks)
+        completed = sum(task.automatic_status == 'completed' for task in assigned_tasks)
+        manager_task_distribution.append({
+            'manager': manager,
+            'total': total,
+            'completed': completed,
+            'percentage': round(total * 100 / manager_task_total) if manager_task_total else 0,
+        })
     monthly_completion_progress, monthly_completion_points = (
         get_institutional_cycle_monthly_progress(active_cycle)
         if is_council(request.user) else ([], '')
@@ -669,6 +747,11 @@ def menu_home(request):
         'department_summaries': council_department_summaries,
         'department_distribution': department_distribution,
         'department_objective_total': department_objective_total,
+        'manager_task_distribution': manager_task_distribution,
+        'manager_task_total': manager_task_total,
+        'manager_task_active': manager_task_active,
+        'manager_task_completed': manager_task_completed,
+        'manager_task_percentage': manager_task_percentage,
         'monthly_completion_progress': monthly_completion_progress,
         'monthly_completion_points': monthly_completion_points,
     }
@@ -908,14 +991,38 @@ def planejamento_objetivo_departamental_menu(request):
         )
         messages.success(request, 'Objetivo departamental criado.')
         return redirect('planejamento_objetivo_departamental_menu')
-    objetivos = department_objectives_for_user(
+    objective_list = list(department_objectives_for_user(
         request.user,
         DepartmentObjective.objects.select_related(
             'institutional_objective__cycle', 'department', 'domain',
         ).prefetch_related('approval_history__domain').order_by('-date_created'),
+    ))
+    department_total = len(objective_list)
+    department_completed_total = sum(
+        objective.automatic_status == 'completed' for objective in objective_list
     )
+    department_active_total = department_total - department_completed_total
+    department_filter = request.GET.get('status', 'all') if is_manager(request.user) else 'all'
+    if department_filter not in {'all', 'active', 'completed'}:
+        department_filter = 'all'
+    if department_filter == 'active':
+        objetivos = [
+            objective for objective in objective_list
+            if objective.automatic_status != 'completed'
+        ]
+    elif department_filter == 'completed':
+        objetivos = [
+            objective for objective in objective_list
+            if objective.automatic_status == 'completed'
+        ]
+    else:
+        objetivos = objective_list
     return render(request, 'shared/objetivo_departamental.html', {
         'objetivos': objetivos,
+        'department_filter': department_filter,
+        'department_total': department_total,
+        'department_active_total': department_active_total,
+        'department_completed_total': department_completed_total,
         'institucional': institucional,
         'institucionais': institucionais,
         'read_only': not can_manage_department_objectives(request.user),
@@ -1188,8 +1295,8 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
         user = get_object_or_404(get_user_model(), pk=user_id, is_active=True)
         department = objective_department_for_request(request, departamental)
-        if not is_collaborator(user) or not department or user_department(user) != department:
-            messages.error(request, 'Selecione um utilizador do mesmo departamento do objetivo.')
+        if not can_receive_individual_objective(request.user, user) or not department or user_department(user) != department:
+            messages.error(request, 'Selecione um responsável autorizado do mesmo departamento do objetivo.')
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
         IndividualObjective.objects.create(
             department_objective=departamental,
@@ -1201,13 +1308,8 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         )
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
-    users = collaborators_for_user(
-        request.user,
-        get_user_model().objects.filter(
-            is_active=True, groups__name='Colaborador'
-        ).select_related('department_profile__department').distinct().order_by('first_name', 'username'),
-    )
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'editing': False})
+    users = individual_assignees_for_user(request.user)
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': False})
 
 
 @login_required
@@ -1218,12 +1320,7 @@ def planejamento_objetivo_individual_menu(request):
             'institutional_objective__cycle', 'department',
         ).prefetch_related('approval_history__domain').order_by('-date_created'),
     )
-    users = collaborators_for_user(
-        request.user,
-        get_user_model().objects.filter(
-            is_active=True, groups__name='Colaborador'
-        ).select_related('department_profile__department').distinct().order_by('first_name', 'username'),
-    )
+    users = individual_assignees_for_user(request.user)
     departamento_ativo = next((item for item in departamentos if item.automatic_status == 'active'), None)
     if request.method == 'POST' and not can_manage_operational_objectives(request.user):
         messages.error(request, 'Acesso apenas de consulta a estes objetivos.')
@@ -1248,8 +1345,8 @@ def planejamento_objetivo_individual_menu(request):
             return redirect('planejamento_objetivo_individual_menu')
         user = get_object_or_404(users, pk=user_id)
         objective_department = objective_department_for_request(request, department)
-        if not is_collaborator(user) or not objective_department or user_department(user) != objective_department:
-            messages.error(request, 'Selecione um utilizador do mesmo departamento do objetivo.')
+        if not can_receive_individual_objective(request.user, user) or not objective_department or user_department(user) != objective_department:
+            messages.error(request, 'Selecione um responsável autorizado do mesmo departamento do objetivo.')
             return redirect('planejamento_objetivo_individual_menu')
         IndividualObjective.objects.create(
             department_objective=department,
@@ -1261,18 +1358,43 @@ def planejamento_objetivo_individual_menu(request):
         )
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_objetivo_individual_menu')
-    objetivos = individual_objectives_for_user(
+    objective_list = list(individual_objectives_for_user(
         request.user,
         IndividualObjective.objects.select_related(
             'department_objective__institutional_objective__cycle',
             'department_objective__department',
             'user',
-        ).order_by('-date_created'),
+        ).prefetch_related('occurrence_records').order_by('-date_created'),
+    ))
+    individual_total = len(objective_list)
+    individual_completed_total = sum(
+        objective.automatic_status == 'completed' for objective in objective_list
     )
+    individual_active_total = individual_total - individual_completed_total
+    individual_filter = request.GET.get('status', 'all') if is_manager(request.user) else 'all'
+    if individual_filter not in {'all', 'active', 'completed'}:
+        individual_filter = 'all'
+    if individual_filter == 'active':
+        objetivos = [
+            objective for objective in objective_list
+            if objective.automatic_status != 'completed'
+        ]
+    elif individual_filter == 'completed':
+        objetivos = [
+            objective for objective in objective_list
+            if objective.automatic_status == 'completed'
+        ]
+    else:
+        objetivos = objective_list
     return render(request, 'shared/objetivo_individual.html', {
         'objetivos': objetivos,
+        'individual_filter': individual_filter,
+        'individual_total': individual_total,
+        'individual_active_total': individual_active_total,
+        'individual_completed_total': individual_completed_total,
         'departamentos': departamentos,
         'users': users,
+        'assignee_label': 'Gestor' if is_council(request.user) else 'Responsável',
         'departamento_ativo': departamento_ativo,
         'read_only': not can_manage_operational_objectives(request.user),
     })
@@ -1301,11 +1423,11 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
             )
         if request.POST.get('user'):
             user = get_object_or_404(
-                collaborators_for_user(request.user), pk=request.POST.get('user')
+                individual_assignees_for_user(request.user), pk=request.POST.get('user')
             )
             objective_department = objective_department_for_request(request, objetivo.department_objective)
-            if not is_collaborator(user) or not objective_department or user_department(user) != objective_department:
-                messages.error(request, 'Selecione um utilizador do mesmo departamento do objetivo.')
+            if not can_receive_individual_objective(request.user, user) or not objective_department or user_department(user) != objective_department:
+                messages.error(request, 'Selecione um responsável autorizado do mesmo departamento do objetivo.')
                 return redirect('planejamento_objetivo_individual_menu')
             objetivo.user = user
         objetivo.save()
@@ -1313,13 +1435,8 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
         if request.POST.get('next') == 'individual_menu':
             return redirect('planejamento_objetivo_individual_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
-    users = collaborators_for_user(
-        request.user,
-        get_user_model().objects.filter(
-            is_active=True, groups__name='Colaborador'
-        ).select_related('department_profile__department').distinct().order_by('first_name', 'username'),
-    )
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'editing': True})
+    users = individual_assignees_for_user(request.user)
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': True})
 
 
 @objective_write_required
@@ -1335,6 +1452,190 @@ def planejamento_objetivo_individual_delete(request, objetivo_id):
             return redirect('planejamento_objetivo_individual_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=cycle_id)
     return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
+
+
+@login_required
+def colaborador_tarefa_atualizar(request, objetivo_id):
+    if not is_collaborator(request.user):
+        messages.error(request, 'Apenas colaboradores podem atualizar as tarefas atribuídas.')
+        return redirect('menu_home')
+    if request.method != 'POST':
+        return redirect('menu_home')
+
+    department = user_department(request.user)
+    tasks = IndividualObjective.objects.select_related(
+        'department_objective__institutional_objective__cycle',
+        'department_objective__department',
+    ).filter(user=request.user)
+    if department:
+        tasks = tasks.filter(department_objective__department=department)
+    else:
+        tasks = tasks.none()
+    task = get_object_or_404(tasks, pk=objetivo_id)
+
+    if task.department_objective.institutional_objective.cycle.automatic_status == 'closed':
+        messages.error(request, 'Não é possível atualizar uma tarefa de um ciclo encerrado.')
+        return redirect('menu_home')
+
+    action = request.POST.get('action')
+    if action == 'start' and task.status == 'draft':
+        task.status = 'active'
+        task.save(update_fields=['status', 'date_update'])
+        messages.success(request, 'Tarefa iniciada com sucesso.')
+    elif action == 'complete' and task.status != 'completed':
+        task.status = 'completed'
+        task.save(update_fields=['status', 'date_update'])
+        messages.success(request, 'Tarefa concluída com sucesso.')
+    else:
+        messages.error(request, 'A tarefa já foi atualizada ou a ação não é válida.')
+    return redirect('menu_home')
+
+
+@login_required
+def colaborador_ocorrencia_criar(request, objetivo_id):
+    if not is_collaborator(request.user):
+        messages.error(request, 'Apenas colaboradores podem registar ocorrências nas suas tarefas.')
+        return redirect('menu_home')
+    if request.method != 'POST':
+        return redirect('menu_home')
+
+    department = user_department(request.user)
+    tasks = IndividualObjective.objects.select_related(
+        'department_objective__institutional_objective__cycle',
+        'department_objective__department',
+    ).filter(user=request.user)
+    if department:
+        tasks = tasks.filter(department_objective__department=department)
+    else:
+        tasks = tasks.none()
+    task = get_object_or_404(tasks, pk=objetivo_id)
+
+    if not task.can_register_occurrence:
+        messages.error(
+            request,
+            'Só é possível registar ocorrências em tarefas em andamento e dentro do prazo definido.',
+        )
+        return redirect(f'{reverse("menu_home")}?status=active')
+
+    description = request.POST.get('description', '').strip()
+    if not description:
+        messages.error(request, 'Descreva a ocorrência antes de guardar.')
+    elif len(description) > 200:
+        messages.error(request, 'A ocorrência não pode ultrapassar 200 caracteres.')
+    else:
+        RegistoOcorrencia.objects.create(
+            individual_objective=task,
+            description=description,
+        )
+        messages.success(request, 'Ocorrência registada com sucesso.')
+    return redirect(f'{reverse("menu_home")}?status=active')
+
+
+@login_required
+def gestor_minhas_tarefas(request):
+    if not is_manager(request.user):
+        messages.error(request, 'Esta área está disponível apenas para o grupo Gestor.')
+        return redirect('menu_home')
+
+    department = user_department(request.user)
+    tasks = IndividualObjective.objects.select_related(
+        'department_objective__institutional_objective__cycle',
+        'department_objective__department',
+    ).prefetch_related('occurrence_records').filter(user=request.user)
+    if department:
+        tasks = tasks.filter(department_objective__department=department)
+    else:
+        tasks = tasks.none()
+    task_list = list(tasks.order_by('end_date', '-date_created'))
+    active_tasks = [task for task in task_list if task.automatic_status != 'completed']
+    completed_tasks = [task for task in task_list if task.automatic_status == 'completed']
+    task_filter = request.GET.get('status', 'all')
+    if task_filter not in {'all', 'active', 'completed'}:
+        task_filter = 'all'
+    if task_filter == 'active':
+        filtered_tasks = active_tasks
+    elif task_filter == 'completed':
+        filtered_tasks = completed_tasks
+    else:
+        filtered_tasks = task_list
+    return render(request, 'gestor/tarefas.html', {
+        'tasks': filtered_tasks,
+        'task_filter': task_filter,
+        'task_total': len(task_list),
+        'active_total': len(active_tasks),
+        'completed_total': len(completed_tasks),
+        'manager_department': department,
+    })
+
+
+@login_required
+def gestor_ocorrencia_criar(request, objetivo_id):
+    if not is_manager(request.user):
+        messages.error(request, 'Apenas o Gestor responsável pode registar ocorrências nesta tarefa.')
+        return redirect('menu_home')
+    if request.method != 'POST':
+        return redirect('gestor_minhas_tarefas')
+
+    department = user_department(request.user)
+    tasks = IndividualObjective.objects.select_related(
+        'department_objective__institutional_objective__cycle',
+        'department_objective__department',
+    ).filter(user=request.user)
+    if department:
+        tasks = tasks.filter(department_objective__department=department)
+    else:
+        tasks = tasks.none()
+    task = get_object_or_404(tasks, pk=objetivo_id)
+
+    if not task.can_register_occurrence:
+        messages.error(
+            request,
+            'Só é possível registar ocorrências em tarefas em andamento e dentro do prazo definido.',
+        )
+        return redirect(f'{reverse("gestor_minhas_tarefas")}?status=active')
+
+    description = request.POST.get('description', '').strip()
+    if not description:
+        messages.error(request, 'Descreva a ocorrência antes de guardar.')
+    elif len(description) > 200:
+        messages.error(request, 'A ocorrência não pode ultrapassar 200 caracteres.')
+    else:
+        RegistoOcorrencia.objects.create(
+            individual_objective=task,
+            description=description,
+        )
+        messages.success(request, 'Ocorrência registada com sucesso.')
+    return redirect(f'{reverse("gestor_minhas_tarefas")}?status=active')
+
+
+@login_required
+def gestor_tarefa_concluir(request, objetivo_id):
+    if not is_manager(request.user):
+        messages.error(request, 'Apenas o Gestor responsável pode concluir esta tarefa.')
+        return redirect('menu_home')
+    if request.method != 'POST':
+        return redirect('gestor_minhas_tarefas')
+
+    department = user_department(request.user)
+    tasks = IndividualObjective.objects.select_related(
+        'department_objective__institutional_objective__cycle',
+        'department_objective__department',
+    ).filter(user=request.user)
+    if department:
+        tasks = tasks.filter(department_objective__department=department)
+    else:
+        tasks = tasks.none()
+    task = get_object_or_404(tasks, pk=objetivo_id)
+
+    if task.department_objective.institutional_objective.cycle.automatic_status == 'closed':
+        messages.error(request, 'Não é possível concluir uma tarefa de um ciclo encerrado.')
+    elif task.status == 'completed':
+        messages.error(request, 'Esta tarefa já se encontra concluída.')
+    else:
+        task.status = 'completed'
+        task.save(update_fields=['status', 'date_update'])
+        messages.success(request, 'Tarefa concluída com sucesso.')
+    return redirect(f'{reverse("gestor_minhas_tarefas")}?status=active')
 
 
 @planning_required

@@ -119,6 +119,18 @@
             <div class="dashboard-note">Percentagens calculadas sobre objetivos departamentais.</div>
           </section>
         </div>
+        {% if is_council_user %}<div class="dashboard-chart-grid manager-task-dashboard-grid">
+          <section class="dashboard-panel">
+            <div class="dashboard-panel-heading"><div><span class="eyebrow">TAREFAS INDIVIDUAIS</span><h3>Tarefas atribuídas aos Gestores</h3></div><span class="dashboard-total">{{ manager_task_total }} total</span></div>
+            <div class="chart-bars">{% for item in manager_task_distribution %}<div class="chart-bar-row"><div class="chart-bar-label"><span>{{ item.manager.get_full_name|default:item.manager.username }}</span><strong>{{ item.total }} · {{ item.percentage }}%</strong></div><div class="chart-bar-track"><i class="chart-bar-individual" style="width:{{ item.percentage }}%"></i></div></div>{% empty %}<p class="dashboard-note">Ainda não existem tarefas individuais atribuídas aos Gestores.</p>{% endfor %}</div>
+            <a class="institutional-dashboard-link" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link>Ver todas as tarefas dos Gestores →</a>
+          </section>
+          <section class="dashboard-panel">
+            <div class="dashboard-panel-heading"><div><span class="eyebrow">PROGRESSO DOS GESTORES</span><h3>Conclusão das tarefas</h3></div><span class="dashboard-total">{{ manager_task_total }} total</span></div>
+            <div class="status-chart departmental-status-chart"><div class="status-donut manager-task-donut" style="--completed:{{ manager_task_percentage }}%"><span>{{ manager_task_percentage }}%</span></div><div class="status-legend"><div><i class="legend-active"></i><span>Em andamento</span><strong>{{ manager_task_active }}</strong></div><div><i class="legend-completed"></i><span>Concluídas</span><strong>{{ manager_task_completed }}</strong></div></div></div>
+            <div class="dashboard-note">Percentagem calculada sobre tarefas individuais atribuídas aos Gestores.</div>
+          </section>
+        </div>{% endif %}
         <section class="dashboard-panel dashboard-department-panel">
           <div class="dashboard-panel-heading">
             <div><span class="eyebrow">{% if is_council_user %}EXECUÇÃO POR DEPARTAMENTO{% else %}COMPARAÇÃO

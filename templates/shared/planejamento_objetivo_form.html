@@ -33,7 +33,7 @@
         {% csrf_token %}
         <div class="form-grid">
           {% if kind == 'individual' %}
-            <label>Utilizador
+            <label>{{ assignee_label|default:'Utilizador' }}
               <select name="user" required>
                 <option value="">Selecionar utilizador</option>
                 {% for user in users %}

@@ -379,7 +379,9 @@ class IndividualObjective(models.Model):
 
     @property
     def automatic_status(self):
-        return 'completed' if self.department_objective.institutional_objective.cycle.automatic_status == 'closed' else 'active'
+        if self.status == 'completed' or self.department_objective.institutional_objective.cycle.automatic_status == 'closed':
+            return 'completed'
+        return self.status
 
     @property
     def automatic_status_display(self):
@@ -415,6 +417,38 @@ class IndividualObjective(models.Model):
         if flag == 'warning':
             return f'Alerta: faltam {days} dia{"s" if days != 1 else ""}'
         return f'{days} dias restantes'
+
+    @property
+    def can_register_occurrence(self):
+        if self.status != 'active' or not self.start_date or not self.end_date:
+            return False
+        today = timezone.localdate()
+        return (
+            self.department_objective.institutional_objective.cycle.automatic_status != 'closed'
+            and self.start_date <= today <= self.end_date
+        )
+
+
+class RegistoOcorrencia(models.Model):
+    description = models.CharField('descrição', max_length=200)
+    individual_objective = models.ForeignKey(
+        IndividualObjective,
+        on_delete=models.CASCADE,
+        related_name='occurrence_records',
+        db_column='objetivo_individual_id',
+        verbose_name='objetivo individual',
+    )
+    date_created = models.DateTimeField('data de criação', auto_now_add=True)
+    date_update = models.DateTimeField('data de atualização', auto_now=True)
+
+    class Meta:
+        db_table = 'registo_ocorrencia'
+        ordering = ['-date_created']
+        verbose_name = 'registo de ocorrência'
+        verbose_name_plural = 'registos de ocorrências'
+
+    def __str__(self):
+        return self.description
 
 
 class Domain(models.Model):
