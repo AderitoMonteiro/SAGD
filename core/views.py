@@ -22,6 +22,22 @@ PHASES = [
 ]
 
 
+def individual_objective_dates(request):
+    """Valida e devolve o período informado para um objetivo individual."""
+    start_value = request.POST.get('start_date', '').strip()
+    end_value = request.POST.get('end_date', '').strip()
+    if not start_value or not end_value:
+        return None, None, 'Indique as datas de início e fim.'
+    try:
+        start_date = date.fromisoformat(start_value)
+        end_date = date.fromisoformat(end_value)
+    except ValueError:
+        return None, None, 'Indique datas válidas.'
+    if end_date < start_date:
+        return None, None, 'A data de fim não pode ser anterior à data de início.'
+    return start_date, end_date, None
+
+
 def cycle_domain_for_type(domain_type):
     """Obtém o domínio do ciclo pelo seu type, nunca pelo id."""
     domain = Domain.objects.filter(type=domain_type).order_by('id').first()
@@ -378,6 +394,9 @@ def department_objective_write_required(view):
 
 @login_required
 def menu_home(request):
+    if not request.user.is_superuser and not request.user.groups.exists():
+        return render(request, 'access/no_group.html', status=403)
+
     if is_manager(request.user):
         manager_department = user_department(request.user)
         department_objectives = DepartmentObjective.objects.select_related(
@@ -410,7 +429,8 @@ def menu_home(request):
             ]
             total = len(objectives_for_collaborator)
             completed = sum(
-                objective.status == 'completed' for objective in objectives_for_collaborator
+                objective.automatic_status == 'completed'
+                for objective in objectives_for_collaborator
             )
             collaborator_progress.append({
                 'user': collaborator,
@@ -428,7 +448,8 @@ def menu_home(request):
         ) if department_progress_total else 0
         progress_total = len(individual_objective_list)
         progress_completed = sum(
-            objective.status == 'completed' for objective in individual_objective_list
+            objective.automatic_status == 'completed'
+            for objective in individual_objective_list
         )
         progress_percentage = round(progress_completed * 100 / progress_total) if progress_total else 0
         active_cycle = Cycle.objects.filter(
@@ -440,16 +461,15 @@ def menu_home(request):
         return render(request, 'gestor/dashboard.html', {
             'active_cycle': active_cycle,
             'department_total': len(department_objective_list),
-            'individual_total': individual_objectives.count(),
+            'individual_total': len(individual_objective_list),
             'active_department_total': sum(item.automatic_status == 'active' for item in department_objective_list),
-            'active_individual_total': sum(item.automatic_status == 'active' for item in individual_objectives),
+            'active_individual_total': sum(item.automatic_status == 'active' for item in individual_objective_list),
             'department_objectives': department_objective_list[:3],
             'department_progress_total': department_progress_total,
             'department_progress_completed': department_progress_completed,
             'department_progress_pending': department_progress_total - department_progress_completed,
             'department_progress_percentage': department_progress_percentage,
-            'individual_objectives': individual_objectives[:5],
-            'department_summaries': get_department_summaries(),
+            'individual_objectives': individual_objective_list[:5],
             'manager_department': manager_department,
             'collaborator_progress': collaborator_progress,
             'progress_total': progress_total,
@@ -521,8 +541,8 @@ def menu_home(request):
         individual_completed = sum(
             item.automatic_status == 'completed' for item in rh_individual_objectives
         )
-        monthly_completion_progress, monthly_completion_points = (
-            get_current_cycle_monthly_progress(active_cycle, rh_department)
+        monthly_manager_progress, monthly_manager_points = (
+            get_manager_monthly_progress(active_cycle, rh_department)
             if active_cycle and rh_department else ([], '')
         )
         return render(request, 'rh/dashboard.html', {
@@ -536,6 +556,13 @@ def menu_home(request):
             ) if department_total else 0,
             'institutional_count': InstitutionalObjective.objects.count(),
             'individual_count': individual_total,
+            'individual_total': individual_total,
+            'active_department_total': sum(
+                item.automatic_status == 'active' for item in rh_department_objectives
+            ),
+            'active_individual_total': sum(
+                item.automatic_status == 'active' for item in rh_individual_objectives
+            ),
             'department_objectives': rh_department_objectives[:3],
             'department_progress_total': department_total,
             'department_progress_completed': department_completed,
@@ -557,8 +584,8 @@ def menu_home(request):
             'institutional_active_percentage': round(
                 institutional_completed_count * 100 / institutional_total
             ) if institutional_total else 0,
-            'monthly_completion_progress': monthly_completion_progress,
-            'monthly_completion_points': monthly_completion_points,
+            'monthly_manager_progress': monthly_manager_progress,
+            'monthly_manager_points': monthly_manager_points,
         })
 
     cycles = Cycle.objects.all()
@@ -645,7 +672,7 @@ def menu_home(request):
         'monthly_completion_progress': monthly_completion_progress,
         'monthly_completion_points': monthly_completion_points,
     }
-    return render(request, 'menu/home.html', context)
+    return render(request, 'administracao/dashboard.html', context)
 
 
 @login_required
@@ -670,19 +697,19 @@ def dashboard(request):
         'can_manage': is_management(request.user),
         'can_plan': can_plan(request.user),
     }
-    template_name = 'CA/dashboard.html' if is_council(request.user) else 'core/dashboard.html'
+    template_name = 'administracao/dashboard_legacy.html' if is_council(request.user) else 'shared/dashboard_legacy.html'
     return render(request, template_name, context)
 
 
 @login_required
 def process_flow(request):
-    return render(request, 'core/process_flow.html', {'phases': PHASES})
+    return render(request, 'shared/process_flow.html', {'phases': PHASES})
 
 
 @login_required
 def planejamento_dashboard(request):
     cycles = Cycle.objects.all().order_by('-start_date')
-    return render(request, 'core/planejamento_dashboard.html', {'cycles': cycles})
+    return render(request, 'shared/planejamento_dashboard.html', {'cycles': cycles})
 
 
 @login_required
@@ -693,7 +720,7 @@ def planejamento_ciclo_detail(request, cycle_id):
         'cycle': cycle,
         'institucionais': institucionais,
     }
-    return render(request, 'core/planejamento_ciclo_detail.html', contexto)
+    return render(request, 'shared/planejamento_ciclo_detail.html', contexto)
 
 
 @login_required
@@ -721,7 +748,7 @@ def planejamento_ciclo_create(request):
         return redirect('planejamento_ciclo_create')
     context = cycle_list_context(request)
     context.update({'editing': False, 'read_only': not can_manage_cycles(request.user)})
-    return render(request, 'ciclo/novo.html', context)
+    return render(request, 'administracao/ciclo.html', context)
 
 
 @login_required
@@ -744,7 +771,7 @@ def planejamento_ciclo_edit(request, cycle_id):
         return redirect('planejamento_ciclo_create')
     context = cycle_list_context(request)
     context.update({'cycle': cycle, 'editing': True})
-    return render(request, 'ciclo/novo.html', context)
+    return render(request, 'administracao/ciclo.html', context)
 
 
 @login_required
@@ -822,7 +849,7 @@ def planejamento_objetivo_institucional_menu(request):
         objetivos = objetivos.filter(cycle__year=int(selected_year))
     else:
         selected_year = ''
-    return render(request, 'objetivo_institucional/novo.html', {
+    return render(request, 'administracao/objetivo_institucional.html', {
         'objetivos': objetivos,
         'cycles': cycles,
         'current_cycle': current_cycle,
@@ -846,7 +873,7 @@ def planejamento_objetivo_institucional_create(request, cycle_id):
         InstitutionalObjective.objects.create(cycle=cycle, description=description, status=request.POST.get('status', 'draft'))
         messages.success(request, 'Objetivo institucional criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=cycle.id)
-    return render(request, 'core/planejamento_objetivo_form.html', {'cycle': cycle, 'kind': 'institucional', 'editing': False})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': cycle, 'kind': 'institucional', 'editing': False})
 
 
 @login_required
@@ -887,7 +914,7 @@ def planejamento_objetivo_departamental_menu(request):
             'institutional_objective__cycle', 'department', 'domain',
         ).prefetch_related('approval_history__domain').order_by('-date_created'),
     )
-    return render(request, 'objetivo_departamental/novo.html', {
+    return render(request, 'shared/objetivo_departamental.html', {
         'objetivos': objetivos,
         'institucional': institucional,
         'institucionais': institucionais,
@@ -912,7 +939,7 @@ def planejamento_objetivo_institucional_edit(request, objetivo_id):
         if request.POST.get('next') == 'objective_menu':
             return redirect('planejamento_objetivo_institucional_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.cycle_id)
-    return render(request, 'core/planejamento_objetivo_form.html', {'cycle': objetivo.cycle, 'objetivo': objetivo, 'kind': 'institucional', 'editing': True})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.cycle, 'objetivo': objetivo, 'kind': 'institucional', 'editing': True})
 
 
 @login_required
@@ -983,7 +1010,7 @@ def planejamento_objetivo_departamental_create(request, objetivo_id):
         )
         messages.success(request, 'Objetivo departamental criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
-    return render(request, 'core/planejamento_objetivo_form.html', {'cycle': institucional.cycle, 'kind': 'departamental', 'parent': institucional, 'editing': False})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': institucional.cycle, 'kind': 'departamental', 'parent': institucional, 'editing': False})
 
 
 @department_objective_write_required
@@ -1017,7 +1044,7 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
         if request.POST.get('next') == 'department_menu':
             return redirect('planejamento_objetivo_departamental_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.institutional_objective.cycle_id)
-    return render(request, 'core/planejamento_objetivo_form.html', {'cycle': objetivo.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'departamental', 'parent': objetivo.institutional_objective, 'editing': True})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'departamental', 'parent': objetivo.institutional_objective, 'editing': True})
 
 
 @department_objective_write_required
@@ -1151,6 +1178,10 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         if not description:
             messages.error(request, 'Descreva o objetivo individual.')
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
+        start_date, end_date, date_error = individual_objective_dates(request)
+        if date_error:
+            messages.error(request, date_error)
+            return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
         user_id = request.POST.get('user')
         if not user_id:
             messages.error(request, 'Selecione o utilizador.')
@@ -1160,7 +1191,14 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         if not is_collaborator(user) or not department or user_department(user) != department:
             messages.error(request, 'Selecione um utilizador do mesmo departamento do objetivo.')
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
-        IndividualObjective.objects.create(department_objective=departamental, user=user, description=description, status=request.POST.get('status', 'draft'))
+        IndividualObjective.objects.create(
+            department_objective=departamental,
+            user=user,
+            description=description,
+            start_date=start_date,
+            end_date=end_date,
+            status=request.POST.get('status', 'draft'),
+        )
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
     users = collaborators_for_user(
@@ -1169,7 +1207,7 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
             is_active=True, groups__name='Colaborador'
         ).select_related('department_profile__department').distinct().order_by('first_name', 'username'),
     )
-    return render(request, 'core/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'editing': False})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'editing': False})
 
 
 @login_required
@@ -1197,6 +1235,10 @@ def planejamento_objetivo_individual_menu(request):
         if not description:
             messages.error(request, 'Descreva o objetivo individual.')
             return redirect('planejamento_objetivo_individual_menu')
+        start_date, end_date, date_error = individual_objective_dates(request)
+        if date_error:
+            messages.error(request, date_error)
+            return redirect('planejamento_objetivo_individual_menu')
         if not department_id or not user_id:
             messages.error(request, 'Selecione o objetivo departamental e o utilizador.')
             return redirect('planejamento_objetivo_individual_menu')
@@ -1209,7 +1251,14 @@ def planejamento_objetivo_individual_menu(request):
         if not is_collaborator(user) or not objective_department or user_department(user) != objective_department:
             messages.error(request, 'Selecione um utilizador do mesmo departamento do objetivo.')
             return redirect('planejamento_objetivo_individual_menu')
-        IndividualObjective.objects.create(department_objective=department, user=user, description=description, status='active')
+        IndividualObjective.objects.create(
+            department_objective=department,
+            user=user,
+            description=description,
+            start_date=start_date,
+            end_date=end_date,
+            status='active',
+        )
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_objetivo_individual_menu')
     objetivos = individual_objectives_for_user(
@@ -1220,7 +1269,7 @@ def planejamento_objetivo_individual_menu(request):
             'user',
         ).order_by('-date_created'),
     )
-    return render(request, 'objetivo_individual/novo.html', {
+    return render(request, 'shared/objetivo_individual.html', {
         'objetivos': objetivos,
         'departamentos': departamentos,
         'users': users,
@@ -1236,6 +1285,14 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
     )
     if request.method == 'POST':
         objetivo.description = request.POST.get('description', objetivo.description).strip()
+        start_date, end_date, date_error = individual_objective_dates(request)
+        if date_error:
+            messages.error(request, date_error)
+            if request.POST.get('next') == 'individual_menu':
+                return redirect('planejamento_objetivo_individual_menu')
+            return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
+        objetivo.start_date = start_date
+        objetivo.end_date = end_date
         department_id = request.POST.get('department_objective')
         if department_id:
             objetivo.department_objective = get_object_or_404(
@@ -1262,7 +1319,7 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
             is_active=True, groups__name='Colaborador'
         ).select_related('department_profile__department').distinct().order_by('first_name', 'username'),
     )
-    return render(request, 'core/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'editing': True})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'editing': True})
 
 
 @objective_write_required
@@ -1311,7 +1368,7 @@ def cycle_create(request):
             if is_council(request.user):
                 return redirect('planejamento_ciclo_detail', cycle_id=cycle.id)
             return redirect('cycle_detail', cycle_id=cycle.id)
-    template_name = 'CA/cycle_create.html' if is_council(request.user) else 'core/cycle_create.html'
+    template_name = 'administracao/cycle_create.html' if is_council(request.user) else 'shared/cycle_create.html'
     return render(request, template_name)
 
 
@@ -1327,7 +1384,7 @@ def cycle_edit(request, cycle_id):
         cycle.save()
         messages.success(request, f'Ciclo {cycle} atualizado com sucesso.')
         return redirect('cycle_detail', cycle_id=cycle.id)
-    return render(request, 'core/cycle_form.html', {'cycle': cycle, 'editing': True})
+    return render(request, 'shared/cycle_form.html', {'cycle': cycle, 'editing': True})
 
 
 @planning_required
@@ -1337,7 +1394,7 @@ def cycle_delete(request, cycle_id):
         cycle.delete()
         messages.success(request, 'Ciclo removido com sucesso.')
         return redirect('menu_home')
-    return render(request, 'core/confirm_delete.html', {'object': cycle, 'object_type': 'ciclo', 'cancel_url': 'cycle_detail', 'cancel_id': cycle.id})
+    return render(request, 'shared/confirm_delete.html', {'object': cycle, 'object_type': 'ciclo', 'cancel_url': 'cycle_detail', 'cancel_id': cycle.id})
 
 
 @login_required
@@ -1352,7 +1409,7 @@ def cycle_detail(request, cycle_id):
     if not is_management(request.user):
         objectives = objectives.filter(employee=request.user)
         follow_ups = follow_ups.filter(employee=request.user)
-    return render(request, 'core/cycle_detail.html', {'cycle': cycle, 'evaluations': evaluations, 'objectives': objectives, 'follow_ups': follow_ups, 'validations': validations, 'phases': PHASES, 'can_manage': is_management(request.user), 'can_plan': can_plan(request.user)})
+    return render(request, 'shared/cycle_detail.html', {'cycle': cycle, 'evaluations': evaluations, 'objectives': objectives, 'follow_ups': follow_ups, 'validations': validations, 'phases': PHASES, 'can_manage': is_management(request.user), 'can_plan': can_plan(request.user)})
 
 
 @planning_required
@@ -1366,7 +1423,7 @@ def objective_create(request, cycle_id):
         Objective.objects.create(cycle=cycle, created_by=request.user, employee_id=None if category == 'organizational' else request.POST.get('employee') or None, category=category, title=request.POST.get('title', '').strip(), description=request.POST.get('description', '').strip(), measure=request.POST.get('measure', '').strip(), status=request.POST.get('status', 'draft'))
         messages.success(request, 'Objetivo registrado no planejamento.')
         return redirect('cycle_detail', cycle_id=cycle.id)
-    template_name = 'CA/objective_form.html' if is_council(request.user) else 'core/objective_form.html'
+    template_name = 'administracao/objective_form.html' if is_council(request.user) else 'shared/objective_form.html'
     return render(request, template_name, {'cycle': cycle, 'users': users, 'is_council': is_council(request.user)})
 
 
@@ -1379,7 +1436,7 @@ def follow_up_create(request, cycle_id):
         messages.success(request, 'Acompanhamento registrado com sucesso.')
         return redirect('cycle_detail', cycle_id=cycle.id)
     users = get_user_model().objects.filter(is_active=True).order_by('first_name', 'username') if is_management(request.user) else []
-    return render(request, 'core/follow_up_form.html', {'cycle': cycle, 'users': users, 'can_manage': is_management(request.user)})
+    return render(request, 'shared/follow_up_form.html', {'cycle': cycle, 'users': users, 'can_manage': is_management(request.user)})
 
 
 @management_required
@@ -1391,7 +1448,7 @@ def validation_create(request, cycle_id):
         Validation.objects.create(cycle=cycle, evaluation_id=request.POST.get('evaluation'), validator_id=request.POST.get('validator') or request.user.id, role=request.POST.get('role', 'manager'), status='pending')
         messages.success(request, 'Validação adicionada ao fluxo.')
         return redirect('cycle_detail', cycle_id=cycle.id)
-    return render(request, 'core/validation_form.html', {'cycle': cycle, 'evaluations': evaluations, 'users': users})
+    return render(request, 'shared/validation_form.html', {'cycle': cycle, 'evaluations': evaluations, 'users': users})
 
 
 @management_required
@@ -1412,7 +1469,7 @@ def evaluation_detail(request, evaluation_id):
     evaluation = get_object_or_404(Evaluation.objects.select_related('cycle', 'employee', 'evaluator'), pk=evaluation_id)
     if not is_management(request.user) and evaluation.employee_id != request.user.id:
         return get_object_or_404(Evaluation, pk=-1)
-    return render(request, 'core/evaluation_detail.html', {'evaluation': evaluation, 'can_manage': is_management(request.user)})
+    return render(request, 'shared/evaluation_detail.html', {'evaluation': evaluation, 'can_manage': is_management(request.user)})
 
 
 @management_required
@@ -1429,7 +1486,7 @@ def evaluation_create(request, cycle_id):
         )
         messages.success(request, 'Avaliação cadastrada com sucesso.')
         return redirect('cycle_detail', cycle_id=cycle.id)
-    return render(request, 'core/evaluation_form.html', {'cycle': cycle, 'users': users, 'editing': False})
+    return render(request, 'shared/evaluation_form.html', {'cycle': cycle, 'users': users, 'editing': False})
 
 
 @login_required
@@ -1448,7 +1505,7 @@ def evaluation_edit(request, evaluation_id):
         evaluation.save()
         messages.success(request, 'Avaliação atualizada com sucesso.')
         return redirect('evaluation_detail', evaluation_id=evaluation.id)
-    return render(request, 'core/evaluation_edit.html', {'evaluation': evaluation, 'can_manage': is_management(request.user)})
+    return render(request, 'shared/evaluation_edit.html', {'evaluation': evaluation, 'can_manage': is_management(request.user)})
 
 
 @management_required
@@ -1459,4 +1516,4 @@ def evaluation_delete(request, evaluation_id):
         evaluation.delete()
         messages.success(request, 'Avaliação removida com sucesso.')
         return redirect('cycle_detail', cycle_id=cycle_id)
-    return render(request, 'core/confirm_delete.html', {'object': evaluation, 'object_type': 'avaliação', 'cancel_url': 'evaluation_detail', 'cancel_id': evaluation.id})
+    return render(request, 'shared/confirm_delete.html', {'object': evaluation, 'object_type': 'avaliação', 'cancel_url': 'evaluation_detail', 'cancel_id': evaluation.id})

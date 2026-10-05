@@ -21,12 +21,15 @@
   <link rel="stylesheet" href="{% static 'css/spa-layout.css' %}">
   <link rel="stylesheet" href="{% static 'css/cycle-status.css' %}">
   <link rel="stylesheet" href="{% static 'css/institutional-objective.css' %}">
+  <link rel="stylesheet" href="{% static 'css/individual-objective-dates.css' %}?v=2">
   <link rel="stylesheet" href="{% static 'css/institutional-objective-state.css' %}">
   <link rel="stylesheet" href="{% static 'css/institutional-objective-readonly.css' %}">
   <link rel="stylesheet" href="{% static 'css/objective-readonly.css' %}">
   <link rel="stylesheet" href="{% static 'css/manager-objectives-readonly.css' %}">
   <link rel="stylesheet" href="{% static 'css/sidebar-toggle.css' %}">
+  <link rel="stylesheet" href="{% static 'css/sidebar-submenu.css' %}?v=1">
   <link rel="stylesheet" href="{% static 'css/sidebar-access-notice.css' %}">
+  <link rel="stylesheet" href="{% static 'css/access-restricted.css' %}?v=2">
   <link rel="stylesheet" href="{% static 'css/dashboard-home.css' %}">
   <link rel="stylesheet" href="{% static 'css/dashboard-cycle-manager-style.css' %}?v=1">
   <link rel="stylesheet" href="{% static 'css/dashboard-cycle-separator.css' %}?v=1">
@@ -128,6 +131,17 @@
       });
     }
 
+    function expandActiveSidebarSubmenu() {
+      document.querySelectorAll('[data-sidebar-submenu]').forEach(function (submenu) {
+        if (!submenu.querySelector('.nav-link.active')) return;
+        submenu.hidden = false;
+        var toggle = document.querySelector('[data-sidebar-submenu-toggle="' + submenu.dataset.sidebarSubmenu + '"]');
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      });
+    }
+
+    expandActiveSidebarSubmenu();
+
     async function loadPage(url, pushState) {
       showNavigationLoader();
       var loadingStartedAt = Date.now();
@@ -148,6 +162,7 @@
       currentContent.replaceWith(nextContent);
       document.title = nextDocument.title;
       updateActiveNavigation(new URL(url, window.location.href).href);
+      expandActiveSidebarSubmenu();
       if (pushState) window.history.pushState({ url: url }, '', url);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       } finally {
@@ -156,6 +171,19 @@
     }
 
     document.addEventListener('click', function (event) {
+      var submenuToggle = event.target.closest('[data-sidebar-submenu-toggle]');
+      if (submenuToggle) {
+        var sidebar = submenuToggle.closest('.sidebar');
+        var submenu = sidebar.querySelector('[data-sidebar-submenu="' + submenuToggle.dataset.sidebarSubmenuToggle + '"]');
+        var shouldOpen = submenu.hidden;
+        sidebar.querySelectorAll('[data-sidebar-submenu]').forEach(function (item) { item.hidden = true; });
+        sidebar.querySelectorAll('[data-sidebar-submenu-toggle]').forEach(function (item) { item.setAttribute('aria-expanded', 'false'); });
+        if (shouldOpen) {
+          submenu.hidden = false;
+          submenuToggle.setAttribute('aria-expanded', 'true');
+        }
+        return;
+      }
       var sidebarToggle = event.target.closest('[data-sidebar-toggle]');
       if (sidebarToggle) {
         document.documentElement.classList.toggle('sidebar-collapsed');

@@ -100,6 +100,7 @@
                 {% endfor %}
               {% endif %}
             </div>
+            {% if is_council_user %}<a class="institutional-dashboard-link" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link>Ver todos os objetivos departamentais →</a>{% endif %}
           </section>
           <section class="dashboard-panel">
             <div class="dashboard-panel-heading">

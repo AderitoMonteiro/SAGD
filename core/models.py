@@ -53,7 +53,6 @@ class Cycle(models.Model):
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
 
-
 class Evaluation(models.Model):
     TYPE_CHOICES = [('mid', 'Intercalar'), ('final', 'Final')]
     STATUS_CHOICES = [('pending', 'Pendente'), ('draft', 'Em preenchimento'), ('submitted', 'Enviada'), ('validated', 'Validada')]
@@ -364,6 +363,8 @@ class IndividualObjective(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='individual_objectives')
     domain = models.ForeignKey('Domain', on_delete=models.SET_NULL, null=True, blank=True, related_name='individual_objectives', verbose_name='domínio')
     description = models.CharField('descrição', max_length=200)
+    start_date = models.DateField('data de início', null=True, blank=True)
+    end_date = models.DateField('data de fim', null=True, blank=True)
     status = models.CharField('status', max_length=15, choices=STATUS_CHOICES, default='draft')
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
     date_update = models.DateTimeField('data de atualização', auto_now=True)
@@ -383,6 +384,37 @@ class IndividualObjective(models.Model):
     @property
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
+
+
+    @property
+    def schedule_flag(self):
+        if not self.start_date or not self.end_date:
+            return 'missing'
+        today = timezone.localdate()
+        if today > self.end_date:
+            return 'overdue'
+        if today < self.start_date:
+            return 'upcoming'
+        return 'warning' if (self.end_date - today).days <= 7 else 'adequate'
+
+    @property
+    def schedule_flag_display(self):
+        flag = self.schedule_flag
+        if flag == 'missing':
+            return 'Prazo não definido'
+        today = timezone.localdate()
+        if flag == 'overdue':
+            days = (today - self.end_date).days
+            return f'Data limite ultrapassada há {days} dia{"s" if days != 1 else ""}'
+        if flag == 'upcoming':
+            days = (self.start_date - today).days
+            return f'Inicia em {days} dia{"s" if days != 1 else ""}'
+        days = (self.end_date - today).days
+        if days == 0:
+            return 'Data limite: hoje'
+        if flag == 'warning':
+            return f'Alerta: faltam {days} dia{"s" if days != 1 else ""}'
+        return f'{days} dias restantes'
 
 
 class Domain(models.Model):

@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Acesso não configurado | SAGD{% endblock %}
+{% block body %}
+<div class="app-shell access-restricted-page">
+  {% include 'includes/management_sidebar.html' with active_menu='' %}
+  <div id="spa-content">
+    <main class="main access-restricted-main">
+      <div class="topbar"><div class="breadcrumb">SAGD <span>/</span> <strong>Acesso não configurado</strong></div></div>
+      <section class="access-restricted-card" role="alert">
+        <div class="access-restricted-icon" aria-hidden="true">!</div>
+        <span class="eyebrow">PERMISSÃO NECESSÁRIA</span>
+        <h1>O seu utilizador não possui um grupo de acesso</h1>
+        <p>O dashboard e os menus do sistema não estão disponíveis enquanto não for atribuído um grupo ao seu utilizador.</p>
+        <div class="access-restricted-guidance">
+          <strong>Contacte o administrador do sistema</strong>
+          <span>Solicite a associação do seu utilizador ao grupo correspondente às suas funções.</span>
+        </div>
+        <form class="access-restricted-logout" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button class="button primary" type="submit">Terminar sessão</button>
+        </form>
+      </section>
+    </main>
+  </div>
+</div>
+{% endblock %}

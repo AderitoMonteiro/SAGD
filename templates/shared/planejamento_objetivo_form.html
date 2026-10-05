@@ -41,6 +41,12 @@
                 {% endfor %}
               </select>
             </label>
+            <label>Data de início
+              <input type="date" name="start_date" value="{% if editing %}{{ objetivo.start_date|date:'Y-m-d' }}{% endif %}" required>
+            </label>
+            <label>Data de fim
+              <input type="date" name="end_date" value="{% if editing %}{{ objetivo.end_date|date:'Y-m-d' }}{% endif %}" required>
+            </label>
           {% endif %}
           <label style="grid-column: 1 / -1;">Descrição
             <textarea name="description" rows="5" required>{% if editing %}{{ objetivo.description }}{% endif %}</textarea>

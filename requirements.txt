@@ -1,3 +1,14 @@
+# Compatível com Python 3.11 ou superior.
+# Django 5.2 é a linha LTS compatível com o Python 3.11 usado pelo projeto.
 Django==5.2.17
-mysqlclient==2.2.7
-gunicorn==23.0.0
+mysqlclient==2.3.0
+
+# Dependências do Django fixadas para instalações reproduzíveis.
+asgiref==3.12.1
+sqlparse==0.6.0
+tzdata==2026.4; platform_system == "Windows"
+
+# Servidor WSGI de produção para Linux/macOS. Em Windows use runserver para
+# desenvolvimento ou publique a aplicação num servidor Linux.
+gunicorn==26.2.0; platform_system != "Windows"
+packaging==26.3; platform_system != "Windows"
