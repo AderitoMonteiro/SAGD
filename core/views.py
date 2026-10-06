@@ -143,7 +143,7 @@ def objective_department_for_request(request, department_objective):
 
 def department_objectives_for_user(user, queryset=None):
     queryset = queryset if queryset is not None else DepartmentObjective.objects.all()
-    if not is_hr(user):
+    if not (is_hr(user) or is_manager(user)):
         return queryset
     department = user_department(user)
     return queryset.filter(department=department) if department else queryset.none()
@@ -167,7 +167,7 @@ def individual_objectives_for_user(user, queryset=None):
     queryset = queryset if queryset is not None else IndividualObjective.objects.all()
     if is_council(user):
         return queryset.filter(user__groups__name='Gestor').distinct()
-    if not is_hr(user):
+    if not (is_hr(user) or is_manager(user)):
         return queryset
     department = user_department(user)
     return queryset.filter(department_objective__department=department) if department else queryset.none()
@@ -177,7 +177,7 @@ def collaborators_for_user(user, queryset=None):
     queryset = queryset if queryset is not None else get_user_model().objects.filter(
         is_active=True, groups__name='Colaborador'
     )
-    if not is_hr(user):
+    if not (is_hr(user) or is_manager(user)):
         return queryset
     department = user_department(user)
     return queryset.filter(department_profile__department=department) if department else queryset.none()

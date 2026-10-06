@@ -3,7 +3,45 @@ from django.db import models
 from django.utils import timezone
 
 
-class Cycle(models.Model):
+class ActiveRecordQuerySet(models.QuerySet):
+    def delete(self):
+        count = 0
+        details = {}
+        for instance in self.iterator():
+            instance.delete()
+            count += 1
+            label = instance._meta.label
+            details[label] = details.get(label, 0) + 1
+        return count, details
+
+    def hard_delete(self):
+        return super().delete()
+
+
+class ActiveRecordManager(models.Manager.from_queryset(ActiveRecordQuerySet)):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_active=True)
+
+
+class ActiveRecord(models.Model):
+    is_active = models.BooleanField('ativo', default=True, db_index=True)
+
+    objects = ActiveRecordManager()
+    all_objects = models.Manager()
+
+    class Meta:
+        abstract = True
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_active = False
+        self.save(using=using, update_fields=['is_active'])
+
+    def restore(self, using=None):
+        self.is_active = True
+        self.save(using=using, update_fields=['is_active'])
+
+
+class Cycle(ActiveRecord):
     STATUS_CHOICES = [('active', 'Em andamento'), ('closed', 'Encerrado'), ('planned', 'Planejado')]
     name = models.CharField('nome', max_length=120)
     year = models.PositiveIntegerField('ano')
@@ -32,6 +70,25 @@ class Cycle(models.Model):
             self.domain = open_domain
         super().save(*args, **kwargs)
 
+    def delete(self, using=None, keep_parents=False):
+        institutional_ids = InstitutionalObjective.all_objects.filter(cycle=self).values_list('id', flat=True)
+        department_ids = DepartmentObjective.all_objects.filter(
+            institutional_objective_id__in=institutional_ids
+        ).values_list('id', flat=True)
+        individual_ids = IndividualObjective.all_objects.filter(
+            department_objective_id__in=department_ids
+        ).values_list('id', flat=True)
+        RegistoOcorrencia.all_objects.filter(individual_objective_id__in=individual_ids).update(is_active=False)
+        IndividualObjective.all_objects.filter(id__in=individual_ids).update(is_active=False)
+        AprovacaoTarefa.all_objects.filter(department_objective_id__in=department_ids).update(is_active=False)
+        DepartmentObjective.all_objects.filter(id__in=department_ids).update(is_active=False)
+        InstitutionalObjective.all_objects.filter(id__in=institutional_ids).update(is_active=False)
+        Validation.all_objects.filter(evaluation__cycle=self).update(is_active=False)
+        Evaluation.all_objects.filter(cycle=self).update(is_active=False)
+        Objective.all_objects.filter(cycle=self).update(is_active=False)
+        FollowUp.all_objects.filter(cycle=self).update(is_active=False)
+        super().delete(using=using, keep_parents=keep_parents)
+
     @property
     def automatic_status(self):
         if self.domain_id and self.domain.type == 2:
@@ -53,7 +110,7 @@ class Cycle(models.Model):
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
 
-class Evaluation(models.Model):
+class Evaluation(ActiveRecord):
     TYPE_CHOICES = [('mid', 'Intercalar'), ('final', 'Final')]
     STATUS_CHOICES = [('pending', 'Pendente'), ('draft', 'Em preenchimento'), ('submitted', 'Enviada'), ('validated', 'Validada')]
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='evaluations')
@@ -75,8 +132,12 @@ class Evaluation(models.Model):
     def display_score(self):
         return self.manager_score or self.self_score
 
+    def delete(self, using=None, keep_parents=False):
+        Validation.all_objects.filter(evaluation=self).update(is_active=False)
+        super().delete(using=using, keep_parents=keep_parents)
 
-class Objective(models.Model):
+
+class Objective(ActiveRecord):
     CATEGORY_CHOICES = [('organizational', 'Organizacional'), ('departmental', 'Departamental'), ('individual', 'Individual')]
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='objectives')
@@ -99,7 +160,7 @@ class Objective(models.Model):
         return self.title
 
 
-class FollowUp(models.Model):
+class FollowUp(ActiveRecord):
     TYPE_CHOICES = [('evidence', 'Evidência'), ('feedback', 'Feedback'), ('adjustment', 'Ajuste de rota')]
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='follow_ups')
     employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='follow_ups')
@@ -116,7 +177,7 @@ class FollowUp(models.Model):
         verbose_name_plural = 'acompanhamentos'
 
 
-class Validation(models.Model):
+class Validation(ActiveRecord):
     STATUS_CHOICES = [('pending', 'Pendente'), ('approved', 'Aprovada'), ('returned', 'Devolvida')]
     ROLE_CHOICES = [('manager', 'Chefia imediata'), ('hr', 'Recursos Humanos'), ('council', 'Conselho de Administração')]
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='validations')
@@ -133,7 +194,7 @@ class Validation(models.Model):
         verbose_name_plural = 'validações'
 
 
-class InstitutionalObjective(models.Model):
+class InstitutionalObjective(ActiveRecord):
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='institutional_objectives')
     domain = models.ForeignKey('Domain', on_delete=models.SET_NULL, null=True, blank=True, related_name='institutional_objectives', verbose_name='domínio')
@@ -162,6 +223,19 @@ class InstitutionalObjective(models.Model):
             self.domain = open_domain
         super().save(*args, **kwargs)
 
+    def delete(self, using=None, keep_parents=False):
+        department_ids = DepartmentObjective.all_objects.filter(
+            institutional_objective=self
+        ).values_list('id', flat=True)
+        individual_ids = IndividualObjective.all_objects.filter(
+            department_objective_id__in=department_ids
+        ).values_list('id', flat=True)
+        RegistoOcorrencia.all_objects.filter(individual_objective_id__in=individual_ids).update(is_active=False)
+        IndividualObjective.all_objects.filter(id__in=individual_ids).update(is_active=False)
+        AprovacaoTarefa.all_objects.filter(department_objective_id__in=department_ids).update(is_active=False)
+        DepartmentObjective.all_objects.filter(id__in=department_ids).update(is_active=False)
+        super().delete(using=using, keep_parents=keep_parents)
+
     @property
     def automatic_status(self):
         if self.domain_id and self.domain.type == 2:
@@ -179,11 +253,10 @@ class InstitutionalObjective(models.Model):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
 
 
-class Department(models.Model):
+class Department(ActiveRecord):
     name = models.CharField('nome', max_length=120, unique=True)
     code = models.CharField('código', max_length=30, unique=True)
     description = models.TextField('descrição', blank=True)
-    is_active = models.BooleanField('ativo', default=True)
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
     date_update = models.DateTimeField('data de atualização', auto_now=True)
 
@@ -196,7 +269,7 @@ class Department(models.Model):
         return f'{self.code} - {self.name}'
 
 
-class UserDepartment(models.Model):
+class UserDepartment(ActiveRecord):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -220,7 +293,7 @@ class UserDepartment(models.Model):
         return f'{self.user} - {self.department or "Sem departamento"}'
 
 
-class AprovacaoTarefa(models.Model):
+class AprovacaoTarefa(ActiveRecord):
     obs = models.CharField('observação', max_length=200)
     department_objective = models.ForeignKey(
         'DepartmentObjective',
@@ -252,7 +325,7 @@ class AprovacaoTarefa(models.Model):
         return self.obs
 
 
-class DepartmentObjective(models.Model):
+class DepartmentObjective(ActiveRecord):
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     institutional_objective = models.ForeignKey(InstitutionalObjective, on_delete=models.CASCADE, related_name='department_objectives')
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='objectives', verbose_name='departamento')
@@ -281,6 +354,15 @@ class DepartmentObjective(models.Model):
                 )
             self.domain = open_domain
         super().save(*args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        individual_ids = IndividualObjective.all_objects.filter(
+            department_objective=self
+        ).values_list('id', flat=True)
+        RegistoOcorrencia.all_objects.filter(individual_objective_id__in=individual_ids).update(is_active=False)
+        IndividualObjective.all_objects.filter(id__in=individual_ids).update(is_active=False)
+        AprovacaoTarefa.all_objects.filter(department_objective=self).update(is_active=False)
+        super().delete(using=using, keep_parents=keep_parents)
 
     @property
     def automatic_status(self):
@@ -357,7 +439,7 @@ class DepartmentObjective(models.Model):
         ]
 
 
-class IndividualObjective(models.Model):
+class IndividualObjective(ActiveRecord):
     STATUS_CHOICES = [('draft', 'Rascunho'), ('active', 'Em andamento'), ('completed', 'Concluído')]
     department_objective = models.ForeignKey(DepartmentObjective, on_delete=models.CASCADE, related_name='individual_objectives')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='individual_objectives')
@@ -376,6 +458,10 @@ class IndividualObjective(models.Model):
 
     def __str__(self):
         return self.description
+
+    def delete(self, using=None, keep_parents=False):
+        RegistoOcorrencia.all_objects.filter(individual_objective=self).update(is_active=False)
+        super().delete(using=using, keep_parents=keep_parents)
 
     @property
     def automatic_status(self):
@@ -429,7 +515,7 @@ class IndividualObjective(models.Model):
         )
 
 
-class RegistoOcorrencia(models.Model):
+class RegistoOcorrencia(ActiveRecord):
     description = models.CharField('descrição', max_length=200)
     individual_objective = models.ForeignKey(
         IndividualObjective,
@@ -451,7 +537,7 @@ class RegistoOcorrencia(models.Model):
         return self.description
 
 
-class Domain(models.Model):
+class Domain(ActiveRecord):
     description = models.CharField('descrição', max_length=100)
     type = models.IntegerField('tipo')
     domain_description = models.CharField('descrição do domínio', max_length=100)
