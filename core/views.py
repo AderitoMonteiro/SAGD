@@ -62,11 +62,17 @@ def individual_objective_percentage(request):
     return percentage, None
 
 
-def available_individual_percentage(department_objective, exclude_objective_id=None):
+def available_individual_percentage(
+    department_objective,
+    planner,
+    exclude_objective_id=None,
+):
     """Saldo percentual ainda disponível num objetivo departamental."""
+    assignee_group = 'Gestor' if is_council(planner) else 'Colaborador'
     objectives = IndividualObjective.objects.filter(
         department_objective=department_objective,
-    )
+        user__groups__name=assignee_group,
+    ).distinct()
     if exclude_objective_id:
         objectives = objectives.exclude(pk=exclude_objective_id)
     distributed = objectives.aggregate(total=Sum('percentagem'))['total'] or Decimal('0')
@@ -76,10 +82,12 @@ def available_individual_percentage(department_objective, exclude_objective_id=N
 def validate_available_individual_percentage(
     department_objective,
     percentage,
+    planner,
     exclude_objective_id=None,
 ):
     available = available_individual_percentage(
         department_objective,
+        planner,
         exclude_objective_id=exclude_objective_id,
     )
     if percentage > available:
@@ -1355,7 +1363,11 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         if percentage_error:
             messages.error(request, percentage_error)
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
-        percentage_error = validate_available_individual_percentage(departamental, percentagem)
+        percentage_error = validate_available_individual_percentage(
+            departamental,
+            percentagem,
+            request.user,
+        )
         if percentage_error:
             messages.error(request, percentage_error)
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
@@ -1380,7 +1392,7 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
     users = individual_assignees_for_user(request.user)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'available_percentage': available_individual_percentage(departamental), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': False})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'available_percentage': available_individual_percentage(departamental, request.user), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': False})
 
 
 @login_required
@@ -1395,7 +1407,8 @@ def planejamento_objetivo_individual_menu(request):
     departamentos = list(departamentos_queryset)
     for department_objective in departamentos:
         department_objective.available_percentage = available_individual_percentage(
-            department_objective
+            department_objective,
+            request.user,
         )
     departamento_ativo = next((item for item in departamentos if item.automatic_status == 'active'), None)
     if request.method == 'POST' and not can_manage_operational_objectives(request.user):
@@ -1423,7 +1436,11 @@ def planejamento_objetivo_individual_menu(request):
         if not department.is_approved:
             messages.error(request, 'Selecione um objetivo departamental aprovado.')
             return redirect('planejamento_objetivo_individual_menu')
-        percentage_error = validate_available_individual_percentage(department, percentagem)
+        percentage_error = validate_available_individual_percentage(
+            department,
+            percentagem,
+            request.user,
+        )
         if percentage_error:
             messages.error(request, percentage_error)
             return redirect('planejamento_objetivo_individual_menu')
@@ -1520,6 +1537,7 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
         percentage_error = validate_available_individual_percentage(
             selected_department,
             percentagem,
+            request.user,
             exclude_objective_id=objetivo.id,
         )
         if percentage_error:
@@ -1544,7 +1562,7 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
             return redirect('planejamento_objetivo_individual_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
     users = individual_assignees_for_user(request.user)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'available_percentage': available_individual_percentage(objetivo.department_objective, exclude_objective_id=objetivo.id), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': True})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'available_percentage': available_individual_percentage(objetivo.department_objective, request.user, exclude_objective_id=objetivo.id), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': True})
 
 
 @objective_write_required

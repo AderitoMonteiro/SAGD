@@ -67,6 +67,7 @@
               <div class="ca-cycle-info">
                 <h4>{{ cycle.name }} <span>{{ cycle.year }}</span></h4>
                 <p>{{ cycle.start_date|date:'d/m/Y' }} a {{ cycle.end_date|date:'d/m/Y' }}</p>
+                {% if cycle.automatic_status != 'closed' %}<span class="cycle-deadline cycle-deadline-{{ cycle.schedule_flag }}">{{ cycle.schedule_flag_display }}</span>{% endif %}
               </div>
               <span class="cycle-status ca-status-{{ cycle.status }}">● {{ cycle.get_status_display }}</span>
               <div class="ca-cycle-detail-actions">

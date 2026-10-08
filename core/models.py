@@ -111,6 +111,31 @@ class Cycle(ActiveRecord):
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
 
+    @property
+    def schedule_flag(self):
+        today = timezone.localdate()
+        if today > self.end_date:
+            return 'overdue'
+        if today < self.start_date:
+            return 'upcoming'
+        return 'warning' if (self.end_date - today).days <= 7 else 'adequate'
+
+    @property
+    def schedule_flag_display(self):
+        today = timezone.localdate()
+        if self.schedule_flag == 'overdue':
+            days = (today - self.end_date).days
+            return f'Data limite ultrapassada há {days} dia{"s" if days != 1 else ""}'
+        if self.schedule_flag == 'upcoming':
+            days = (self.start_date - today).days
+            return f'Inicia em {days} dia{"s" if days != 1 else ""}'
+        days = (self.end_date - today).days
+        if days == 0:
+            return 'Data limite: hoje'
+        if self.schedule_flag == 'warning':
+            return f'Alerta: faltam {days} dia{"s" if days != 1 else ""}'
+        return f'{days} dias restantes'
+
 class Evaluation(ActiveRecord):
     TYPE_CHOICES = [('mid', 'Intercalar'), ('final', 'Final')]
     STATUS_CHOICES = [('pending', 'Pendente'), ('draft', 'Em preenchimento'), ('submitted', 'Enviada'), ('validated', 'Validada')]
@@ -252,7 +277,6 @@ class InstitutionalObjective(ActiveRecord):
     @property
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
-
 
 class Department(ActiveRecord):
     name = models.CharField('nome', max_length=120, unique=True)

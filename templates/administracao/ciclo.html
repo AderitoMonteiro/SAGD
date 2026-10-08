@@ -37,6 +37,7 @@
                 <div class="cycle-record-info">
                   <strong>{{ item.name }}</strong>
                   <span>{{ item.start_date|date:'d/m/Y' }} a {{ item.end_date|date:'d/m/Y' }}</span>
+                  {% if item.automatic_status != 'closed' %}<span class="cycle-deadline cycle-deadline-{{ item.schedule_flag }}">{{ item.schedule_flag_display }}</span>{% endif %}
                 </div>
                 <span class="cycle-record-status ca-status-{{ item.automatic_status }}">{{ item.automatic_status_display }}</span>
                 <div class="cycle-record-actions">

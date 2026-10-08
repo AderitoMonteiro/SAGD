@@ -1,0 +1,99 @@
+.sidebar-account-footer .account-summary {
+  position: relative;
+  overflow: hidden;
+  padding: 13px 12px 12px;
+  border-color: rgba(126, 184, 224, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(29, 77, 126, 0.58), rgba(11, 43, 82, 0.76));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12), inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-account-footer .account-summary::before {
+  content: "";
+  position: absolute;
+  top: -52px;
+  right: -42px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(112, 200, 169, 0.13);
+}
+
+.sidebar-account-footer .user-line {
+  position: relative;
+  gap: 11px;
+}
+
+.sidebar-account-footer .account-identity {
+  min-width: 0;
+}
+
+.sidebar-account-footer .account-identity strong {
+  display: block;
+  overflow: hidden;
+  color: #f7fbff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-account-footer .avatar.account-avatar {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: linear-gradient(145deg, #83dbc0, #4eb99b);
+  box-shadow: 0 7px 16px rgba(29, 151, 120, 0.24), inset 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.sidebar-account-footer .account-avatar svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: #07375b;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sidebar-account-footer .account-avatar-status {
+  position: absolute;
+  right: -1px;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #12375f;
+  border-radius: 50%;
+  background: #71d4ae;
+  box-shadow: 0 0 0 2px rgba(113, 212, 174, 0.13);
+}
+
+.sidebar-account-footer .user-role {
+  overflow: hidden;
+  margin-top: 3px;
+  color: #9db7cf;
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.sidebar-account-footer .account-status {
+  position: relative;
+  margin-top: 10px;
+  margin-left: 51px;
+  color: #9bb2c8;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.15px;
+}
+
+html.sidebar-collapsed .sidebar-account-footer .account-summary {
+  padding: 8px;
+}
+
+html.sidebar-collapsed .sidebar-account-footer .account-avatar {
+  margin: auto;
+}

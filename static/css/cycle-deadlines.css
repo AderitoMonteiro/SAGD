@@ -1,0 +1,40 @@
+.cycle-deadline {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 5px 9px;
+  border-radius: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cycle-deadline::before {
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.cycle-deadline-adequate {
+  color: #176b57;
+  background: #dff4ec;
+}
+
+.cycle-deadline-warning {
+  color: #a14e16;
+  background: #fff0dd;
+}
+
+.cycle-deadline-overdue {
+  color: #a63a32;
+  background: #fde7e4;
+}
+
+.cycle-deadline-upcoming {
+  color: #315f91;
+  background: #e7f0fa;
+}

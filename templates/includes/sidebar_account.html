@@ -1,8 +1,11 @@
 <div class="sidebar-footer sidebar-account-footer">
   <div class="account-summary">
     <div class="user-line">
-      <div class="avatar">{{ user.username|first|upper }}</div>
-      <div>
+      <div class="avatar account-avatar" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4.75 20c.55-3.36 3.16-5.5 7.25-5.5s6.7 2.14 7.25 5.5"/></svg>
+        <span class="account-avatar-status"></span>
+      </div>
+      <div class="account-identity">
         <strong>{{ user.get_full_name|default:user.username }}</strong>
         <div class="user-role">{{ account_role|default:'Gestão de desempenho' }}</div>
       </div>
