@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -447,6 +448,13 @@ class IndividualObjective(ActiveRecord):
     description = models.CharField('descrição', max_length=200)
     start_date = models.DateField('data de início', null=True, blank=True)
     end_date = models.DateField('data de fim', null=True, blank=True)
+    percentagem = models.DecimalField(
+        'percentagem',
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
     status = models.CharField('status', max_length=15, choices=STATUS_CHOICES, default='draft')
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
     date_update = models.DateTimeField('data de atualização', auto_now=True)

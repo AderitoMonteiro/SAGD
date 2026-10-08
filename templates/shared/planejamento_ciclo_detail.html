@@ -115,7 +115,7 @@
                   <div class="detail-label">{{ individual.user.get_full_name|default:individual.user.username }}</div>
                   <p>{{ individual.description }}</p>
                   <div class="ca-cycle-detail-actions">
-                    <a class="button" href="{% url 'planejamento_objetivo_individual_edit' individual.id %}">Editar</a>
+                    {% if individual.automatic_status != 'completed' %}<a class="button" href="{% url 'planejamento_objetivo_individual_edit' individual.id %}">Editar</a>{% endif %}
                     <form method="post" action="{% url 'planejamento_objetivo_individual_delete' individual.id %}" onsubmit="return confirm('Eliminar este objetivo individual?');">
                       {% csrf_token %}
                       <button class="button ca-delete-button" type="submit">Eliminar</button>

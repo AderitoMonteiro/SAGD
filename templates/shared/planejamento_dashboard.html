@@ -40,12 +40,12 @@
     <div class="stats">
       <div class="stat-card">
         <div class="stat-label">Ciclos criados</div>
-        <div class="stat-number">{{ cycles|length }}</div>
+        <div class="stat-number">{{ cycles_total }}</div>
         <div class="stat-meta">Registos ativos</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Último ciclo</div>
-        <div class="stat-number">{% if cycles %}{{ cycles.0.year }}{% else %}—{% endif %}</div>
+        <div class="stat-number">{% if latest_cycle %}{{ latest_cycle.year }}{% else %}—{% endif %}</div>
         <div class="stat-meta">Período mais recente</div>
       </div>
     </div>
@@ -80,6 +80,7 @@
             </article>
           {% endfor %}
         </div>
+        {% include 'includes/pagination.html' with page_obj=cycles %}
       {% else %}
         <div class="ca-empty-state ca-empty-compact">
           <div class="ca-empty-orbit">CA</div>

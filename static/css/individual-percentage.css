@@ -1,0 +1,43 @@
+.individual-percentage-field {
+  color: #6d4aa2 !important;
+  font-weight: 800 !important;
+}
+
+.individual-percentage-field input {
+  border-color: #9b82c4 !important;
+  background: #faf7ff !important;
+  color: #40256d !important;
+  font-weight: 700;
+}
+
+.individual-percentage-field input:focus {
+  border-color: #6d4aa2 !important;
+  box-shadow: 0 0 0 3px rgba(109, 74, 162, 0.14);
+}
+
+.individual-percentage-highlight {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f0e9fb;
+  color: #6d4aa2 !important;
+  font-weight: 700;
+}
+
+.collaborator-task-main .individual-percentage-highlight {
+  margin: 4px 0 8px;
+}
+
+.individual-percentage-highlight strong {
+  color: #40256d;
+}
+
+.objective-status-completed + .objective-record-actions [data-open-individual-modal^="edit-"] {
+  display: none !important;
+}
+
+[hidden] {
+  display: none !important;
+}

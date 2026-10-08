@@ -25,6 +25,7 @@
                 </article>
               {% endfor %}
             </div>
+            {% include 'includes/pagination.html' with page_obj=objetivos %}
           {% else %}
             <div class="objective-empty"><span>◎</span><h2>Nenhum objetivo institucional</h2><p>Crie o primeiro objetivo para iniciar o desdobramento estratégico.</p><button class="button primary" type="button" data-open-objective-modal="create">Criar objetivo <span>＋</span></button></div>
           {% endif %}

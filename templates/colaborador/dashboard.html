@@ -23,7 +23,7 @@
               <article class="collaborator-task-card{% if task.automatic_status == 'completed' %} is-completed{% endif %}">
                 <div class="collaborator-task-main">
                   <div class="collaborator-task-icon">◇</div>
-                  <div><h3>{{ task.description }}</h3><p>Objetivo departamental: {{ task.department_objective.description|truncatechars:85 }}</p><div class="collaborator-task-dates"><span>Início <strong>{{ task.start_date|date:'d/m/Y'|default:'—' }}</strong></span><span>Fim <strong>{{ task.end_date|date:'d/m/Y'|default:'—' }}</strong></span>{% if task.automatic_status != 'completed' %}<span class="individual-schedule-flag individual-schedule-flag-{{ task.schedule_flag }}">{{ task.schedule_flag_display }}</span>{% endif %}</div></div>
+                  <div><h3>{{ task.description }}</h3><p>Objetivo departamental: {{ task.department_objective.description|truncatechars:85 }}</p><span class="individual-percentage-highlight">Percentagem aplicada: <strong>{{ task.percentagem|floatformat:2 }}%</strong></span><div class="collaborator-task-dates"><span>Início <strong>{{ task.start_date|date:'d/m/Y'|default:'—' }}</strong></span><span>Fim <strong>{{ task.end_date|date:'d/m/Y'|default:'—' }}</strong></span>{% if task.automatic_status != 'completed' %}<span class="individual-schedule-flag individual-schedule-flag-{{ task.schedule_flag }}">{{ task.schedule_flag_display }}</span>{% endif %}</div></div>
                 </div>
                 <div class="collaborator-task-action">
                   <span class="objective-status objective-status-{{ task.automatic_status }}">{{ task.automatic_status_display }}</span>
@@ -41,6 +41,7 @@
               <div class="collaborator-empty"><span>✓</span><h2>Nenhuma tarefa encontrada</h2><p>Não existem tarefas para o filtro selecionado.</p></div>
             {% endfor %}
           </div>
+          {% include 'includes/pagination.html' with page_obj=tasks %}
         </section>
       </div>
     </main>

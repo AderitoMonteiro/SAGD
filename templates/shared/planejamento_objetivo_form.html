@@ -47,6 +47,10 @@
             <label>Data de fim
               <input type="date" name="end_date" value="{% if editing %}{{ objetivo.end_date|date:'Y-m-d' }}{% endif %}" required>
             </label>
+            <label class="individual-percentage-field">Percentagem aplicada
+              <input type="number" name="percentagem" min="0" max="{{ available_percentage|floatformat:'2u' }}" step="0.01" value="{% if editing %}{{ objetivo.percentagem|floatformat:'2u' }}{% else %}0{% endif %}" required>
+              <small>Saldo disponível para distribuição: <strong>{{ available_percentage|floatformat:2 }}%</strong>.</small>
+            </label>
           {% endif %}
           <label style="grid-column: 1 / -1;">Descrição
             <textarea name="description" rows="5" required>{% if editing %}{{ objetivo.description }}{% endif %}</textarea>

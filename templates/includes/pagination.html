@@ -1,0 +1,20 @@
+{% if page_obj.paginator.num_pages > 1 %}
+  <nav class="record-pagination" aria-label="Paginação da listagem">
+    {% if page_obj.has_previous %}
+      <a href="{% querystring page=page_obj.previous_page_number %}" data-spa-link aria-label="Página anterior">← Anterior</a>
+    {% else %}
+      <span class="is-disabled">← Anterior</span>
+    {% endif %}
+
+    <span class="record-pagination-summary">
+      Página <strong>{{ page_obj.number }}</strong> de <strong>{{ page_obj.paginator.num_pages }}</strong>
+      <small>{{ page_obj.paginator.count }} registos</small>
+    </span>
+
+    {% if page_obj.has_next %}
+      <a href="{% querystring page=page_obj.next_page_number %}" data-spa-link aria-label="Página seguinte">Seguinte →</a>
+    {% else %}
+      <span class="is-disabled">Seguinte →</span>
+    {% endif %}
+  </nav>
+{% endif %}

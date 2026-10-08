@@ -49,6 +49,7 @@
               </article>
             {% endfor %}
           </div>
+          {% include 'includes/pagination.html' with page_obj=cycles %}
         {% else %}
           <div class="cycle-empty-state">
             <div class="cycle-empty-symbol">◷</div>

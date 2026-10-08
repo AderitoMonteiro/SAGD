@@ -22,6 +22,7 @@
             </article>
             {% endfor %}
           </div>
+          {% include 'includes/pagination.html' with page_obj=objetivos %}
           {% else %}
           <div class="objective-empty"><span>◈</span><h2>Nenhum objetivo departamental</h2><p>Crie o primeiro objetivo a partir do objetivo institucional ativo.</p><button class="button primary" type="button" data-open-department-modal="create" {% if not institucional %}disabled{% endif %}>Criar objetivo <span>＋</span></button>{% if not institucional %}<small class="objective-field-note">É necessário existir um objetivo institucional num ciclo em andamento.</small>{% endif %}</div>
           {% endif %}

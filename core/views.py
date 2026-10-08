@@ -1,10 +1,12 @@
 import calendar
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
-from django.db.models import OuterRef, Subquery
+from django.db.models import OuterRef, Subquery, Sum
+from django.core.paginator import Paginator
 from django.utils import timezone
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -23,6 +25,11 @@ PHASES = [
 ]
 
 
+def paginate_records(request, records, parameter='page'):
+    """Apresenta listagens em blocos fixos de dez registos."""
+    return Paginator(records, 10).get_page(request.GET.get(parameter))
+
+
 def individual_objective_dates(request):
     """Valida e devolve o período informado para um objetivo individual."""
     start_value = request.POST.get('start_date', '').strip()
@@ -37,6 +44,50 @@ def individual_objective_dates(request):
     if end_date < start_date:
         return None, None, 'A data de fim não pode ser anterior à data de início.'
     return start_date, end_date, None
+
+
+def individual_objective_percentage(request):
+    """Valida a percentagem atribuída ao objetivo individual."""
+    value = request.POST.get('percentagem', '').strip().replace(',', '.')
+    if not value:
+        return None, 'Indique a percentagem aplicada na tarefa.'
+    try:
+        percentage = Decimal(value)
+    except InvalidOperation:
+        return None, 'Indique uma percentagem válida.'
+    if percentage < 0 or percentage > 100:
+        return None, 'A percentagem deve estar entre 0 e 100.'
+    if percentage.as_tuple().exponent < -2:
+        return None, 'A percentagem pode ter no máximo duas casas decimais.'
+    return percentage, None
+
+
+def available_individual_percentage(department_objective, exclude_objective_id=None):
+    """Saldo percentual ainda disponível num objetivo departamental."""
+    objectives = IndividualObjective.objects.filter(
+        department_objective=department_objective,
+    )
+    if exclude_objective_id:
+        objectives = objectives.exclude(pk=exclude_objective_id)
+    distributed = objectives.aggregate(total=Sum('percentagem'))['total'] or Decimal('0')
+    return max(Decimal('0'), Decimal('100') - distributed)
+
+
+def validate_available_individual_percentage(
+    department_objective,
+    percentage,
+    exclude_objective_id=None,
+):
+    available = available_individual_percentage(
+        department_objective,
+        exclude_objective_id=exclude_objective_id,
+    )
+    if percentage > available:
+        return (
+            f'A percentagem indicada ultrapassa o saldo disponível. '
+            f'Pode distribuir no máximo {available:.2f}% neste objetivo departamental.'
+        )
+    return None
 
 
 def cycle_domain_for_type(domain_type):
@@ -64,7 +115,11 @@ def cycle_list_context(request):
         cycles = cycles.filter(year=int(selected_year))
     else:
         selected_year = ''
-    return {'cycles': cycles, 'years': years, 'selected_year': selected_year}
+    return {
+        'cycles': paginate_records(request, cycles),
+        'years': years,
+        'selected_year': selected_year,
+    }
 
 
 def is_management(user):
@@ -631,6 +686,7 @@ def menu_home(request):
             filtered_tasks = completed_tasks
         else:
             filtered_tasks = task_list
+        filtered_tasks = paginate_records(request, filtered_tasks)
         return render(request, 'colaborador/dashboard.html', {
             'collaborator_department': collaborator_department,
             'tasks': filtered_tasks,
@@ -792,7 +848,11 @@ def process_flow(request):
 @login_required
 def planejamento_dashboard(request):
     cycles = Cycle.objects.all().order_by('-start_date')
-    return render(request, 'shared/planejamento_dashboard.html', {'cycles': cycles})
+    return render(request, 'shared/planejamento_dashboard.html', {
+        'cycles': paginate_records(request, cycles),
+        'cycles_total': cycles.count(),
+        'latest_cycle': cycles.first(),
+    })
 
 
 @login_required
@@ -932,6 +992,7 @@ def planejamento_objetivo_institucional_menu(request):
         objetivos = objetivos.filter(cycle__year=int(selected_year))
     else:
         selected_year = ''
+    objetivos = paginate_records(request, objetivos)
     return render(request, 'administracao/objetivo_institucional.html', {
         'objetivos': objetivos,
         'cycles': cycles,
@@ -1017,6 +1078,7 @@ def planejamento_objetivo_departamental_menu(request):
         ]
     else:
         objetivos = objective_list
+    objetivos = paginate_records(request, objetivos)
     return render(request, 'shared/objetivo_departamental.html', {
         'objetivos': objetivos,
         'department_filter': department_filter,
@@ -1289,6 +1351,14 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         if date_error:
             messages.error(request, date_error)
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
+        percentagem, percentage_error = individual_objective_percentage(request)
+        if percentage_error:
+            messages.error(request, percentage_error)
+            return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
+        percentage_error = validate_available_individual_percentage(departamental, percentagem)
+        if percentage_error:
+            messages.error(request, percentage_error)
+            return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
         user_id = request.POST.get('user')
         if not user_id:
             messages.error(request, 'Selecione o utilizador.')
@@ -1304,23 +1374,29 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
             description=description,
             start_date=start_date,
             end_date=end_date,
+            percentagem=percentagem,
             status=request.POST.get('status', 'draft'),
         )
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
     users = individual_assignees_for_user(request.user)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': False})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'available_percentage': available_individual_percentage(departamental), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': False})
 
 
 @login_required
 def planejamento_objetivo_individual_menu(request):
-    departamentos = approved_department_objectives_for_user(
+    departamentos_queryset = approved_department_objectives_for_user(
         request.user,
         DepartmentObjective.objects.select_related(
             'institutional_objective__cycle', 'department',
         ).prefetch_related('approval_history__domain').order_by('-date_created'),
     )
     users = individual_assignees_for_user(request.user)
+    departamentos = list(departamentos_queryset)
+    for department_objective in departamentos:
+        department_objective.available_percentage = available_individual_percentage(
+            department_objective
+        )
     departamento_ativo = next((item for item in departamentos if item.automatic_status == 'active'), None)
     if request.method == 'POST' and not can_manage_operational_objectives(request.user):
         messages.error(request, 'Acesso apenas de consulta a estes objetivos.')
@@ -1336,12 +1412,20 @@ def planejamento_objetivo_individual_menu(request):
         if date_error:
             messages.error(request, date_error)
             return redirect('planejamento_objetivo_individual_menu')
+        percentagem, percentage_error = individual_objective_percentage(request)
+        if percentage_error:
+            messages.error(request, percentage_error)
+            return redirect('planejamento_objetivo_individual_menu')
         if not department_id or not user_id:
             messages.error(request, 'Selecione o objetivo departamental e o utilizador.')
             return redirect('planejamento_objetivo_individual_menu')
-        department = get_object_or_404(departamentos, pk=department_id)
+        department = get_object_or_404(departamentos_queryset, pk=department_id)
         if not department.is_approved:
             messages.error(request, 'Selecione um objetivo departamental aprovado.')
+            return redirect('planejamento_objetivo_individual_menu')
+        percentage_error = validate_available_individual_percentage(department, percentagem)
+        if percentage_error:
+            messages.error(request, percentage_error)
             return redirect('planejamento_objetivo_individual_menu')
         user = get_object_or_404(users, pk=user_id)
         objective_department = objective_department_for_request(request, department)
@@ -1354,6 +1438,7 @@ def planejamento_objetivo_individual_menu(request):
             description=description,
             start_date=start_date,
             end_date=end_date,
+            percentagem=percentagem,
             status='active',
         )
         messages.success(request, 'Objetivo individual criado.')
@@ -1386,6 +1471,7 @@ def planejamento_objetivo_individual_menu(request):
         ]
     else:
         objetivos = objective_list
+    objetivos = paginate_records(request, objetivos)
     return render(request, 'shared/objetivo_individual.html', {
         'objetivos': objetivos,
         'individual_filter': individual_filter,
@@ -1405,6 +1491,9 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
     objetivo = get_object_or_404(
         individual_objectives_for_user(request.user), pk=objetivo_id
     )
+    if objetivo.automatic_status == 'completed':
+        messages.error(request, 'Uma tarefa individual concluída não pode ser editada.')
+        return redirect('planejamento_objetivo_individual_menu')
     if request.method == 'POST':
         objetivo.description = request.POST.get('description', objetivo.description).strip()
         start_date, end_date, date_error = individual_objective_dates(request)
@@ -1415,12 +1504,31 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
             return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
         objetivo.start_date = start_date
         objetivo.end_date = end_date
+        percentagem, percentage_error = individual_objective_percentage(request)
+        if percentage_error:
+            messages.error(request, percentage_error)
+            if request.POST.get('next') == 'individual_menu':
+                return redirect('planejamento_objetivo_individual_menu')
+            return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
         department_id = request.POST.get('department_objective')
+        selected_department = objetivo.department_objective
         if department_id:
-            objetivo.department_objective = get_object_or_404(
+            selected_department = get_object_or_404(
                 approved_department_objectives_for_user(request.user),
                 pk=department_id,
             )
+        percentage_error = validate_available_individual_percentage(
+            selected_department,
+            percentagem,
+            exclude_objective_id=objetivo.id,
+        )
+        if percentage_error:
+            messages.error(request, percentage_error)
+            if request.POST.get('next') == 'individual_menu':
+                return redirect('planejamento_objetivo_individual_menu')
+            return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
+        objetivo.percentagem = percentagem
+        objetivo.department_objective = selected_department
         if request.POST.get('user'):
             user = get_object_or_404(
                 individual_assignees_for_user(request.user), pk=request.POST.get('user')
@@ -1436,7 +1544,7 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
             return redirect('planejamento_objetivo_individual_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
     users = individual_assignees_for_user(request.user)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': True})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'available_percentage': available_individual_percentage(objetivo.department_objective, exclude_objective_id=objetivo.id), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': True})
 
 
 @objective_write_required
@@ -1558,6 +1666,7 @@ def gestor_minhas_tarefas(request):
         filtered_tasks = completed_tasks
     else:
         filtered_tasks = task_list
+    filtered_tasks = paginate_records(request, filtered_tasks)
     return render(request, 'gestor/tarefas.html', {
         'tasks': filtered_tasks,
         'task_filter': task_filter,
