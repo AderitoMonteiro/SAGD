@@ -68,13 +68,17 @@
   <section class="cycle-modal-card" role="dialog" aria-modal="true" aria-labelledby="create-cycle-title">
     <div class="cycle-modal-header"><div><span class="eyebrow">GESTÃO DE CICLOS</span><h2 id="create-cycle-title">Criar novo ciclo</h2></div><button class="cycle-modal-close" type="button" data-close-cycle-modal aria-label="Fechar">×</button></div>
     <p class="cycle-intro">Preencha os dados do período que será usado no planejamento.</p>
-    <form method="post" action="{% url 'planejamento_ciclo_create' %}">
+    {% if cycle_form_error and open_cycle_modal == 'create' %}<div class="alert cycle-form-error" role="alert">{{ cycle_form_error }}</div>{% endif %}
+    <form method="post" action="{% url 'planejamento_ciclo_create' %}" data-cycle-dates-form>
       {% csrf_token %}
       <div class="form-grid">
-        <label>Nome do ciclo<input type="text" name="name" placeholder="Ex.: Ciclo de desempenho 2026" required></label>
-        <label>Ano<input type="number" name="year" min="2000" max="2100" placeholder="2026" required></label>
-        <label>Data de início<input type="date" name="start_date" required></label>
-        <label>Data de encerramento<input type="date" name="end_date" required></label>
+        <label>Nome do ciclo<input type="text" name="name" placeholder="Ex.: Ciclo de desempenho {{ current_year }}" value="{{ cycle_form_data.name|default:'' }}" required></label>
+        <label>Ano
+          <input class="cycle-current-year" type="text" value="{{ current_year }}" disabled aria-disabled="true" tabindex="-1">
+          <input type="hidden" name="year" value="{{ current_year }}">
+        </label>
+        <label>Data de início<input type="date" name="start_date" min="{{ current_date|date:'Y-m-d' }}" value="{{ cycle_form_data.start_date|default:'' }}" data-cycle-start-date required></label>
+        <label>Data de encerramento<input type="date" name="end_date" value="{{ cycle_form_data.end_date|default:'' }}" data-cycle-end-date required></label>
       </div>
       <div class="form-actions"><button class="button" type="button" data-close-cycle-modal>Cancelar</button><button class="button primary" type="submit">Criar ciclo <span>→</span></button></div>
     </form>
@@ -93,9 +97,10 @@
   <div class="cycle-modal-backdrop" data-close-cycle-modal></div>
   <section class="cycle-modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-cycle-title-{{ item.id }}">
     <div class="cycle-modal-header"><div><span class="eyebrow">EDIÇÃO DO CICLO</span><h2 id="edit-cycle-title-{{ item.id }}">Editar ciclo</h2></div><button class="cycle-modal-close" type="button" data-close-cycle-modal aria-label="Fechar">×</button></div>
-    <form method="post" action="{% url 'planejamento_ciclo_edit' item.id %}">
+    {% if cycle_form_error and edit_error_cycle_id == item.id %}<div class="alert cycle-form-error" role="alert">{{ cycle_form_error }}</div>{% endif %}
+    <form method="post" action="{% url 'planejamento_ciclo_edit' item.id %}?page={{ cycles.number }}" data-cycle-dates-form>
       {% csrf_token %}
-      <div class="form-grid"><label>Nome do ciclo<input type="text" name="name" value="{{ item.name }}" required></label><label>Ano<input type="number" name="year" min="2000" max="2100" value="{{ item.year }}" required></label><label>Data de início<input type="date" name="start_date" value="{{ item.start_date|date:'Y-m-d' }}" required></label><label>Data de encerramento<input type="date" name="end_date" value="{{ item.end_date|date:'Y-m-d' }}" required></label></div>
+      <div class="form-grid"><label>Nome do ciclo<input type="text" name="name" value="{{ item.name }}" required></label><label>Ano<input class="cycle-current-year" type="text" value="{{ item.year }}" disabled aria-disabled="true" tabindex="-1"></label><label>Data de início<input type="date" name="start_date" min="{{ current_date|date:'Y-m-d' }}" value="{{ item.start_date|date:'Y-m-d' }}" data-cycle-start-date required></label><label>Data de encerramento<input type="date" name="end_date" value="{{ item.end_date|date:'Y-m-d' }}" data-cycle-end-date required></label></div>
       <div class="form-actions"><button class="button" type="button" data-close-cycle-modal>Cancelar</button><button class="button primary" type="submit">Guardar alterações</button></div>
     </form>
   </section>
@@ -123,6 +128,7 @@
     document.querySelectorAll('[data-switch-cycle-modal]').forEach(function (button) { button.addEventListener('click', function () { openModal(button.dataset.switchCycleModal); }); });
     document.querySelectorAll('[data-close-cycle-modal]').forEach(function (button) { button.addEventListener('click', closeAll); });
     document.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeAll(); });
+    {% if open_cycle_modal %}openModal('{{ open_cycle_modal|escapejs }}');{% endif %}
   }());
 </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 import calendar
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
@@ -43,6 +43,35 @@ def individual_objective_dates(request):
         return None, None, 'Indique datas válidas.'
     if end_date < start_date:
         return None, None, 'A data de fim não pode ser anterior à data de início.'
+    return start_date, end_date, None
+
+
+def validate_individual_dates_within_cycle(start_date, end_date, cycle):
+    """Garante que a tarefa individual decorre inteiramente dentro do ciclo."""
+    if start_date <= cycle.start_date or end_date >= cycle.end_date:
+        return (
+            'A data de início deve ser posterior ao início do ciclo e a data de fim '
+            f'deve ser anterior ao encerramento do ciclo ({cycle.start_date:%d/%m/%Y} a '
+            f'{cycle.end_date:%d/%m/%Y}).'
+        )
+    return None
+
+
+def cycle_dates(request, not_before=None):
+    """Valida que o ciclo possui um intervalo cronológico válido."""
+    start_value = request.POST.get('start_date', '').strip()
+    end_value = request.POST.get('end_date', '').strip()
+    if not start_value or not end_value:
+        return None, None, 'Indique as datas de início e de encerramento.'
+    try:
+        start_date = date.fromisoformat(start_value)
+        end_date = date.fromisoformat(end_value)
+    except ValueError:
+        return None, None, 'Indique datas válidas para o ciclo.'
+    if not_before and start_date < not_before:
+        return None, None, 'A data de início não pode ser anterior à data atual.'
+    if start_date >= end_date:
+        return None, None, 'A data de encerramento deve ser posterior à data de início.'
     return start_date, end_date, None
 
 
@@ -98,6 +127,33 @@ def validate_available_individual_percentage(
     return None
 
 
+def available_department_percentage(institutional_objective, exclude_objective_id=None):
+    """Saldo percentual ainda disponível num objetivo institucional."""
+    objectives = DepartmentObjective.objects.filter(
+        institutional_objective=institutional_objective,
+    )
+    if exclude_objective_id:
+        objectives = objectives.exclude(pk=exclude_objective_id)
+    distributed = objectives.aggregate(total=Sum('percentagem'))['total'] or Decimal('0')
+    return max(Decimal('0'), Decimal('100') - distributed)
+
+
+def validate_available_department_percentage(
+    institutional_objective, percentage, exclude_objective_id=None,
+):
+    if percentage is None or percentage <= 0:
+        return 'A percentagem aplicada deve ser maior que 0%.'
+    available = available_department_percentage(
+        institutional_objective, exclude_objective_id=exclude_objective_id,
+    )
+    if percentage > available:
+        return (
+            f'A percentagem indicada ultrapassa o saldo disponível. '
+            f'Pode distribuir no máximo {available:.2f}% neste objetivo institucional.'
+        )
+    return None
+
+
 def cycle_domain_for_type(domain_type):
     """Obtém o domínio do ciclo pelo seu type, nunca pelo id."""
     domain = Domain.objects.filter(type=domain_type).order_by('id').first()
@@ -127,6 +183,8 @@ def cycle_list_context(request):
         'cycles': paginate_records(request, cycles),
         'years': years,
         'selected_year': selected_year,
+        'current_year': timezone.localdate().year,
+        'current_date': timezone.localdate(),
     }
 
 
@@ -881,15 +939,25 @@ def planejamento_ciclo_create(request):
         return redirect('planejamento_ciclo_create')
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
-        year = request.POST.get('year', '').strip()
-        start_date = request.POST.get('start_date', '').strip()
-        end_date = request.POST.get('end_date', '').strip()
-        if not name or not year or not start_date or not end_date:
-            messages.error(request, 'Preencha todos os campos do ciclo.')
-            return redirect('planejamento_ciclo_create')
+        year = timezone.localdate().year
+        start_date, end_date, date_error = cycle_dates(
+            request,
+            not_before=timezone.localdate(),
+        )
+        form_error = 'Preencha todos os campos do ciclo.' if not name else date_error
+        if form_error:
+            context = cycle_list_context(request)
+            context.update({
+                'editing': False,
+                'read_only': False,
+                'cycle_form_error': form_error,
+                'cycle_form_data': request.POST,
+                'open_cycle_modal': 'create',
+            })
+            return render(request, 'administracao/ciclo.html', context, status=400)
         cycle = Cycle.objects.create(
             name=name,
-            year=int(year),
+            year=year,
             start_date=start_date,
             end_date=end_date,
             domain=cycle_domain_for_type(1),
@@ -912,10 +980,25 @@ def planejamento_ciclo_edit(request, cycle_id):
         messages.error(request, 'Apenas ciclos abertos podem ser editados.')
         return redirect('planejamento_ciclo_create')
     if request.method == 'POST':
+        start_date, end_date, date_error = cycle_dates(
+            request,
+            not_before=timezone.localdate(),
+        )
+        if date_error:
+            context = cycle_list_context(request)
+            context.update({
+                'cycle': cycle,
+                'editing': True,
+                'read_only': False,
+                'cycle_form_error': date_error,
+                'cycle_form_data': request.POST,
+                'edit_error_cycle_id': cycle.id,
+                'open_cycle_modal': f'edit-{cycle.id}',
+            })
+            return render(request, 'administracao/ciclo.html', context, status=400)
         cycle.name = request.POST.get('name', cycle.name).strip()
-        cycle.year = request.POST.get('year', cycle.year)
-        cycle.start_date = request.POST.get('start_date', cycle.start_date)
-        cycle.end_date = request.POST.get('end_date', cycle.end_date)
+        cycle.start_date = start_date
+        cycle.end_date = end_date
         cycle.status = request.POST.get('status', cycle.status)
         cycle.save()
         messages.success(request, 'Ciclo atualizado com sucesso.')
@@ -1030,11 +1113,15 @@ def planejamento_objetivo_institucional_create(request, cycle_id):
 
 @login_required
 def planejamento_objetivo_departamental_menu(request):
-    institucionais = InstitutionalObjective.objects.select_related('cycle').order_by('-date_created')
-    institucional = institucionais.filter(
-        cycle__start_date__lte=timezone.localdate(),
-        cycle__end_date__gte=timezone.localdate(),
-    ).first()
+    institucionais = list(
+        InstitutionalObjective.objects.select_related('cycle').order_by('-date_created')
+    )
+    for item in institucionais:
+        item.available_department_percentage = available_department_percentage(item)
+    institucional = next((
+        item for item in institucionais
+        if item.cycle.start_date <= timezone.localdate() <= item.cycle.end_date
+    ), None) or (institucionais[0] if institucionais else None)
     if request.method == 'POST' and not can_manage_department_objectives(request.user):
         messages.error(request, 'Acesso apenas de consulta a estes objetivos.')
         return redirect('planejamento_objetivo_departamental_menu')
@@ -1042,20 +1129,26 @@ def planejamento_objetivo_departamental_menu(request):
         description = request.POST.get('description', '').strip()
         institutional_objective_id = request.POST.get('institutional_objective')
         department = user_department(request.user)
-        if not description:
-            messages.error(request, 'Descreva o objetivo departamental.')
-            return redirect('planejamento_objetivo_departamental_menu')
-        if not institutional_objective_id:
-            messages.error(request, 'Selecione o objetivo institucional.')
+        if not description or not institutional_objective_id or not request.POST.get('percentagem', '').strip():
+            messages.error(request, 'Preencha todos os campos obrigatórios do objetivo departamental.')
             return redirect('planejamento_objetivo_departamental_menu')
         if not department:
             messages.error(request, 'Associe um departamento ao utilizador antes de criar o objetivo.')
             return redirect('planejamento_objetivo_departamental_menu')
         institucional = get_object_or_404(InstitutionalObjective, pk=institutional_objective_id)
+        percentagem, percentage_error = individual_objective_percentage(request)
+        if percentage_error:
+            messages.error(request, percentage_error.replace('na tarefa', 'no objetivo departamental'))
+            return redirect('planejamento_objetivo_departamental_menu')
+        percentage_error = validate_available_department_percentage(institucional, percentagem)
+        if percentage_error:
+            messages.error(request, percentage_error)
+            return redirect('planejamento_objetivo_departamental_menu')
         DepartmentObjective.objects.create(
             institutional_objective=institucional,
             department=department,
             description=description,
+            percentagem=percentagem,
             status='active',
         )
         messages.success(request, 'Objetivo departamental criado.')
@@ -1173,21 +1266,30 @@ def planejamento_objetivo_departamental_create(request, objetivo_id):
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
         department = user_department(request.user)
-        if not description:
-            messages.error(request, 'Descreva o objetivo departamental.')
+        percentagem, percentage_error = individual_objective_percentage(request)
+        if not description or not request.POST.get('percentagem', '').strip():
+            messages.error(request, 'Preencha todos os campos obrigatórios do objetivo departamental.')
             return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
         if not department:
             messages.error(request, 'Associe um departamento ao utilizador antes de criar o objetivo.')
+            return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
+        if percentage_error:
+            messages.error(request, percentage_error.replace('na tarefa', 'no objetivo departamental'))
+            return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
+        percentage_error = validate_available_department_percentage(institucional, percentagem)
+        if percentage_error:
+            messages.error(request, percentage_error)
             return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
         DepartmentObjective.objects.create(
             institutional_objective=institucional,
             department=department,
             description=description,
+            percentagem=percentagem,
             status=request.POST.get('status', 'draft'),
         )
         messages.success(request, 'Objetivo departamental criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': institucional.cycle, 'kind': 'departamental', 'parent': institucional, 'editing': False})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': institucional.cycle, 'kind': 'departamental', 'parent': institucional, 'available_percentage': available_department_percentage(institucional), 'editing': False})
 
 
 @department_objective_write_required
@@ -1203,10 +1305,25 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
         return redirect('planejamento_objetivo_departamental_menu')
     if request.method == 'POST':
         was_rejected = objetivo.approval_status == 'rejected'
-        objetivo.description = request.POST.get('description', objetivo.description).strip()
+        description = request.POST.get('description', '').strip()
         institutional_objective_id = request.POST.get('institutional_objective')
+        if not description or not institutional_objective_id or not request.POST.get('percentagem', '').strip():
+            messages.error(request, 'Preencha todos os campos obrigatórios do objetivo departamental.')
+            return redirect('planejamento_objetivo_departamental_menu')
+        objetivo.description = description
         if institutional_objective_id:
             objetivo.institutional_objective = get_object_or_404(InstitutionalObjective, pk=institutional_objective_id)
+        percentagem, percentage_error = individual_objective_percentage(request)
+        if percentage_error:
+            messages.error(request, percentage_error.replace('na tarefa', 'no objetivo departamental'))
+            return redirect('planejamento_objetivo_departamental_menu')
+        percentage_error = validate_available_department_percentage(
+            objetivo.institutional_objective, percentagem, exclude_objective_id=objetivo.id,
+        )
+        if percentage_error:
+            messages.error(request, percentage_error)
+            return redirect('planejamento_objetivo_departamental_menu')
+        objetivo.percentagem = percentagem
         objetivo.status = request.POST.get('status', objetivo.status)
         objetivo.save()
         if was_rejected:
@@ -1221,7 +1338,7 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
         if request.POST.get('next') == 'department_menu':
             return redirect('planejamento_objetivo_departamental_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.institutional_objective.cycle_id)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'departamental', 'parent': objetivo.institutional_objective, 'editing': True})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'departamental', 'parent': objetivo.institutional_objective, 'available_percentage': available_department_percentage(objetivo.institutional_objective, exclude_objective_id=objetivo.id), 'editing': True})
 
 
 @department_objective_write_required
@@ -1359,6 +1476,12 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         if date_error:
             messages.error(request, date_error)
             return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
+        date_error = validate_individual_dates_within_cycle(
+            start_date, end_date, departamental.institutional_objective.cycle,
+        )
+        if date_error:
+            messages.error(request, date_error)
+            return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
         percentagem, percentage_error = individual_objective_percentage(request)
         if percentage_error:
             messages.error(request, percentage_error)
@@ -1392,7 +1515,8 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         messages.success(request, 'Objetivo individual criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=departamental.institutional_objective.cycle_id)
     users = individual_assignees_for_user(request.user)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': departamental.institutional_objective.cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'available_percentage': available_individual_percentage(departamental, request.user), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': False})
+    cycle = departamental.institutional_objective.cycle
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': cycle, 'kind': 'individual', 'parent': departamental, 'users': users, 'available_percentage': available_individual_percentage(departamental, request.user), 'individual_min_date': cycle.start_date + timedelta(days=1), 'individual_max_date': cycle.end_date - timedelta(days=1), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': False})
 
 
 @login_required
@@ -1410,6 +1534,9 @@ def planejamento_objetivo_individual_menu(request):
             department_objective,
             request.user,
         )
+        cycle = department_objective.institutional_objective.cycle
+        department_objective.task_start_min = cycle.start_date + timedelta(days=1)
+        department_objective.task_end_max = cycle.end_date - timedelta(days=1)
     departamento_ativo = next((item for item in departamentos if item.automatic_status == 'active'), None)
     if request.method == 'POST' and not can_manage_operational_objectives(request.user):
         messages.error(request, 'Acesso apenas de consulta a estes objetivos.')
@@ -1435,6 +1562,12 @@ def planejamento_objetivo_individual_menu(request):
         department = get_object_or_404(departamentos_queryset, pk=department_id)
         if not department.is_approved:
             messages.error(request, 'Selecione um objetivo departamental aprovado.')
+            return redirect('planejamento_objetivo_individual_menu')
+        date_error = validate_individual_dates_within_cycle(
+            start_date, end_date, department.institutional_objective.cycle,
+        )
+        if date_error:
+            messages.error(request, date_error)
             return redirect('planejamento_objetivo_individual_menu')
         percentage_error = validate_available_individual_percentage(
             department,
@@ -1534,6 +1667,14 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
                 approved_department_objectives_for_user(request.user),
                 pk=department_id,
             )
+        date_error = validate_individual_dates_within_cycle(
+            start_date, end_date, selected_department.institutional_objective.cycle,
+        )
+        if date_error:
+            messages.error(request, date_error)
+            if request.POST.get('next') == 'individual_menu':
+                return redirect('planejamento_objetivo_individual_menu')
+            return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
         percentage_error = validate_available_individual_percentage(
             selected_department,
             percentagem,
@@ -1562,7 +1703,8 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
             return redirect('planejamento_objetivo_individual_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.department_objective.institutional_objective.cycle_id)
     users = individual_assignees_for_user(request.user)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.department_objective.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'available_percentage': available_individual_percentage(objetivo.department_objective, request.user, exclude_objective_id=objetivo.id), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': True})
+    cycle = objetivo.department_objective.institutional_objective.cycle
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': cycle, 'objetivo': objetivo, 'kind': 'individual', 'parent': objetivo.department_objective, 'users': users, 'available_percentage': available_individual_percentage(objetivo.department_objective, request.user, exclude_objective_id=objetivo.id), 'individual_min_date': cycle.start_date + timedelta(days=1), 'individual_max_date': cycle.end_date - timedelta(days=1), 'assignee_label': 'Gestor' if is_council(request.user) else 'Utilizador', 'editing': True})
 
 
 @objective_write_required

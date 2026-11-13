@@ -356,6 +356,10 @@ class DepartmentObjective(ActiveRecord):
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='objectives', verbose_name='departamento')
     domain = models.ForeignKey('Domain', on_delete=models.SET_NULL, null=True, blank=True, related_name='department_objectives', verbose_name='domínio')
     description = models.CharField('descrição', max_length=200)
+    percentagem = models.DecimalField(
+        'percentagem', max_digits=5, decimal_places=2, default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+    )
     status = models.CharField('status', max_length=15, choices=STATUS_CHOICES, default='draft')
     date_created = models.DateTimeField('data de criação', auto_now_add=True)
     date_update = models.DateTimeField('data de atualização', auto_now=True)
@@ -584,3 +588,53 @@ class Domain(ActiveRecord):
 
     def __str__(self):
         return self.description
+
+
+class HistoricoOperacao(models.Model):
+    ACAO_CHOICES = [
+        ('criar', 'Criar'),
+        ('editar', 'Editar'),
+        ('eliminar', 'Eliminar'),
+        ('restaurar', 'Restaurar'),
+        ('aprovar', 'Aprovar'),
+        ('rejeitar', 'Rejeitar'),
+        ('concluir', 'Concluir'),
+        ('reabrir', 'Reabrir'),
+        ('login', 'Iniciar sessão'),
+        ('logout', 'Terminar sessão'),
+        ('login_falhou', 'Falha de autenticação'),
+    ]
+
+    utilizador = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='operacoes_registadas',
+    )
+    acao = models.CharField('ação', max_length=20, choices=ACAO_CHOICES)
+    modelo = models.CharField('modelo', max_length=100, blank=True)
+    objeto_id = models.CharField('ID do objeto', max_length=100, blank=True)
+    descricao_objeto = models.CharField('descrição do objeto', max_length=255, blank=True)
+    dados_anteriores = models.JSONField('dados anteriores', null=True, blank=True)
+    dados_novos = models.JSONField('dados novos', null=True, blank=True)
+    descricao = models.TextField('descrição', blank=True)
+    endereco_ip = models.GenericIPAddressField('endereço IP', null=True, blank=True)
+    user_agent = models.TextField('navegador/dispositivo', blank=True)
+    rota = models.CharField('rota', max_length=255, blank=True)
+    metodo_http = models.CharField('método HTTP', max_length=10, blank=True)
+    data_criacao = models.DateTimeField('data de criação', auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'historico_operacoes'
+        ordering = ['-data_criacao', '-id']
+        verbose_name = 'histórico de operação'
+        verbose_name_plural = 'histórico de operações'
+        indexes = [
+            models.Index(fields=['utilizador', 'data_criacao']),
+            models.Index(fields=['acao', 'data_criacao']),
+            models.Index(fields=['modelo', 'objeto_id']),
+        ]
+
+    def __str__(self):
+        return f'{self.get_acao_display()} · {self.modelo or "Sistema"} · {self.data_criacao:%d/%m/%Y %H:%M}'

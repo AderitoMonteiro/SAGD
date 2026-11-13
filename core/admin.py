@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Cycle, Department, DepartmentObjective, Domain, Evaluation, InstitutionalObjective, UserDepartment
+from .models import Cycle, Department, DepartmentObjective, Domain, Evaluation, HistoricoOperacao, InstitutionalObjective, UserDepartment
 
 
 @admin.register(Cycle)
@@ -58,7 +58,7 @@ class InstitutionalObjectiveAdmin(admin.ModelAdmin):
 
 @admin.register(DepartmentObjective)
 class DepartmentObjectiveAdmin(admin.ModelAdmin):
-    list_display = ('description', 'department', 'domain', 'institutional_objective', 'status', 'date_created')
+    list_display = ('description', 'department', 'percentagem', 'domain', 'institutional_objective', 'status', 'date_created')
     list_filter = ('status', 'department', 'domain', 'institutional_objective__cycle')
     search_fields = ('description', 'department__name', 'department__code', 'institutional_objective__description')
     autocomplete_fields = ('department', 'institutional_objective')
@@ -69,3 +69,26 @@ class DomainAdmin(admin.ModelAdmin):
     list_display = ('description', 'type', 'domain_description', 'date_update')
     list_filter = ('type',)
     search_fields = ('description', 'domain_description')
+
+
+@admin.register(HistoricoOperacao)
+class HistoricoOperacaoAdmin(admin.ModelAdmin):
+    list_display = ('data_criacao', 'utilizador', 'acao', 'modelo', 'objeto_id', 'endereco_ip')
+    list_filter = ('acao', 'modelo', 'data_criacao')
+    search_fields = ('utilizador__username', 'descricao_objeto', 'descricao', 'objeto_id', 'endereco_ip')
+    readonly_fields = (
+        'utilizador', 'acao', 'modelo', 'objeto_id', 'descricao_objeto',
+        'dados_anteriores', 'dados_novos', 'descricao', 'endereco_ip',
+        'user_agent', 'rota', 'metodo_http', 'data_criacao',
+    )
+    date_hierarchy = 'data_criacao'
+    ordering = ('-data_criacao',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
