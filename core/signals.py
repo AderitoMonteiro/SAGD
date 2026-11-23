@@ -98,7 +98,7 @@ def record_model_operation(sender, instance, created=False, raw=False, **kwargs)
         instance=instance,
         before=before,
         after=after,
-        description=audit_description(action, instance),
+        description=getattr(instance, '_audit_description', audit_description(action, instance)),
     )
 
 

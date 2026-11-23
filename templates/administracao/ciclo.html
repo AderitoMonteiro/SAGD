@@ -33,7 +33,7 @@
           <div class="cycle-record-list">
             {% for item in cycles %}
               <article class="cycle-record{% if cycle and item.id == cycle.id %} cycle-record-current{% endif %}">
-                <div class="cycle-record-state"><button class="cycle-state-trigger" type="button" data-open-cycle-modal="toggle-{{ item.id }}" aria-label="Alterar estado do ciclo {{ item.name }}">⋮</button><div class="cycle-record-mark">{{ item.year|stringformat:'s'|slice:'-2:' }}</div></div>
+                <div class="cycle-record-state">{% if item.is_open or is_admin_user %}<button class="cycle-state-trigger" type="button" data-open-cycle-modal="toggle-{{ item.id }}" aria-label="Alterar estado do ciclo {{ item.name }}">⋮</button>{% endif %}<div class="cycle-record-mark">{{ item.year|stringformat:'s'|slice:'-2:' }}</div></div>
                 <div class="cycle-record-info">
                   <strong>{{ item.name }}</strong>
                   <span>{{ item.start_date|date:'d/m/Y' }} a {{ item.end_date|date:'d/m/Y' }}</span>
@@ -109,8 +109,21 @@
   <div class="cycle-modal-backdrop" data-close-cycle-modal></div>
   <section class="cycle-modal-card cycle-state-modal" role="dialog" aria-modal="true" aria-labelledby="toggle-cycle-title-{{ item.id }}">
     <div class="cycle-modal-header"><div><span class="eyebrow">ESTADO DO CICLO</span><h2 id="toggle-cycle-title-{{ item.id }}">{{ item.name }}</h2></div><button class="cycle-modal-close" type="button" data-close-cycle-modal aria-label="Fechar">×</button></div>
-    <p class="cycle-intro">{% if item.is_open %}Este ciclo está aberto. Confirme quando pretender concluí-lo.{% else %}Este ciclo está concluído. Confirme quando pretender reabri-lo.{% endif %}</p>
-    <div class="form-actions cycle-state-actions"><button class="button" type="button" data-close-cycle-modal>Cancelar</button><form method="post" action="{% url 'planejamento_ciclo_toggle_status' item.id %}">{% csrf_token %}<input type="hidden" name="target_type" value="{% if item.is_open %}2{% else %}1{% endif %}"><button class="button cycle-confirm-button" type="submit">{% if item.is_open %}Concluir ciclo{% else %}Reabrir ciclo{% endif %}</button></form></div>
+    {% if item.is_open %}
+      <p class="cycle-intro">Este ciclo está aberto. Confirme quando pretender concluí-lo.</p>
+      <div class="form-actions cycle-state-actions"><button class="button" type="button" data-close-cycle-modal>Cancelar</button><form method="post" action="{% url 'planejamento_ciclo_toggle_status' item.id %}">{% csrf_token %}<input type="hidden" name="target_type" value="2"><button class="button cycle-confirm-button" type="submit">Concluir ciclo</button></form></div>
+    {% elif is_admin_user %}
+      <p class="cycle-intro">Para reabrir este ciclo, prorrogue a data de encerramento e justifique a decisão.</p>
+      <form method="post" action="{% url 'planejamento_ciclo_toggle_status' item.id %}">
+        {% csrf_token %}<input type="hidden" name="target_type" value="1">
+        <div class="form-grid">
+          <label>Data de encerramento anterior<input type="text" value="{{ item.end_date|date:'d/m/Y' }}" disabled></label>
+          <label>Nova data de encerramento<input type="date" name="new_end_date" min="{{ item.reopen_min_date|date:'Y-m-d' }}" required></label>
+          <label style="grid-column:1 / -1">Justificação<textarea name="reopen_reason" rows="4" maxlength="500" placeholder="Indique o motivo da reabertura e da extensão do prazo" required></textarea><small>Máximo de 500 caracteres.</small></label>
+        </div>
+        <div class="form-actions cycle-state-actions"><button class="button" type="button" data-close-cycle-modal>Cancelar</button><button class="button cycle-confirm-button" type="submit">Reabrir e estender ciclo</button></div>
+      </form>
+    {% endif %}
   </section>
 </div>
 <div class="cycle-modal" data-cycle-modal="delete-{{ item.id }}" aria-hidden="true">

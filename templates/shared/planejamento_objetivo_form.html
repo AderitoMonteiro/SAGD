@@ -53,7 +53,7 @@
             </label>
           {% elif kind == 'departamental' %}
             <label class="individual-percentage-field">Percentagem aplicada
-              <input type="number" name="percentagem" min="0" max="{{ available_percentage|floatformat:'2u' }}" step="0.01" value="{% if editing %}{{ objetivo.percentagem|floatformat:'2u' }}{% else %}0{% endif %}" required>
+              <input type="number" name="percentagem" min="0.01" max="{{ available_percentage|floatformat:'2u' }}" step="0.01" value="{% if editing %}{{ objetivo.percentagem|floatformat:'2u' }}{% endif %}" required>
               <small>Saldo disponível para distribuição: <strong>{{ available_percentage|floatformat:2 }}%</strong>.</small>
             </label>
           {% endif %}

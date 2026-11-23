@@ -10,7 +10,7 @@
     <a class="nav-link" href="{% url 'process_flow' %}"><span class="nav-icon">⌁</span><span>Cronograma</span></a>
     <div class="nav-label" style="margin-top:27px">Gestão</div>
     <a class="nav-link" href="{% url 'planejamento_ciclo_create' %}"><span class="nav-icon">＋</span><span>Novo ciclo</span></a>
-    <details class="planning-menu" open>
+    {% if cycle.is_open %}<details class="planning-menu" open>
       <summary class="nav-link"><span class="nav-icon">◎</span><span>Criar objetivo</span><span class="planning-menu-arrow">⌄</span></summary>
       <a href="{% url 'planejamento_objetivo_institucional_create' cycle.id %}">Objetivo institucional</a>
       {% for objetivo in institucionais %}
@@ -21,19 +21,19 @@
           {% if departamental.is_approved %}<a href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">↳ Individual</a>{% endif %}
         {% endfor %}
       {% endfor %}
-    </details>
+    </details>{% endif %}
   </aside>
 
   <main class="main">
     <div class="topbar">
       <div class="breadcrumb">SAGD <span>/</span> <strong>{{ cycle.name }} {{ cycle.year }}</strong></div>
-      <div class="top-actions">
+      {% if cycle.is_open %}<div class="top-actions">
         <a class="button" href="{% url 'planejamento_ciclo_edit' cycle.id %}">Editar</a>
         <form method="post" action="{% url 'planejamento_ciclo_delete' cycle.id %}" onsubmit="return confirm('Eliminar este ciclo?');">
           {% csrf_token %}
           <button class="button ca-delete-button" type="submit">Eliminar</button>
         </form>
-      </div>
+      </div>{% endif %}
     </div>
 
     <section class="ca-cycle-strip">
@@ -44,6 +44,7 @@
       </div>
       <span class="cycle-status ca-status-{{ cycle.status }}">● {{ cycle.get_status_display }}</span>
     </section>
+    {% if not cycle.is_open %}<div class="alert" role="status">Este ciclo está encerrado. Os objetivos e tarefas estão disponíveis apenas para consulta.</div>{% endif %}
 
     <div class="stats">
       <div class="stat-card">
@@ -59,7 +60,7 @@
           <span class="eyebrow">HIERARQUIA ESTRATÉGICA</span>
           <h3>Objetivos do ciclo</h3>
         </div>
-        <a class="button primary" href="{% url 'planejamento_objetivo_institucional_create' cycle.id %}">Adicionar objetivo institucional <span>＋</span></a>
+        {% if cycle.is_open %}<a class="button primary" href="{% url 'planejamento_objetivo_institucional_create' cycle.id %}">Adicionar objetivo institucional <span>＋</span></a>{% endif %}
       </div>
 
       {% for objetivo in institucionais %}
@@ -69,13 +70,13 @@
               <span class="eyebrow">OBJETIVO INSTITUCIONAL</span>
               <h4>{{ objetivo.description }}</h4>
             </div>
-            <div class="ca-cycle-detail-actions">
+            {% if cycle.is_open %}<div class="ca-cycle-detail-actions">
               <a class="button" href="{% url 'planejamento_objetivo_institucional_edit' objetivo.id %}">Editar</a>
               <form method="post" action="{% url 'planejamento_objetivo_institucional_delete' objetivo.id %}" onsubmit="return confirm('Eliminar este objetivo institucional?');">
                 {% csrf_token %}
                 <button class="button ca-delete-button" type="submit">Eliminar</button>
               </form>
-            </div>
+            </div>{% endif %}
           </div>
 
           <div class="panel-title" style="margin-top: 18px;">
@@ -83,7 +84,7 @@
               <span class="eyebrow">DEPARTAMENTAIS</span>
               <h4>Objetivos departamentais</h4>
             </div>
-            <a class="button" href="{% url 'planejamento_objetivo_departamental_create' objetivo.id %}">Adicionar departamental <span>＋</span></a>
+            {% if cycle.is_open %}<a class="button" href="{% url 'planejamento_objetivo_departamental_create' objetivo.id %}">Adicionar departamental <span>＋</span></a>{% endif %}
           </div>
 
           {% for departamental in objetivo.department_objectives.all %}
@@ -93,13 +94,13 @@
                   <span class="eyebrow">OBJETIVO DEPARTAMENTAL</span>
                   <h5>{{ departamental.description }}</h5>
                 </div>
-                <div class="ca-cycle-detail-actions">
+                {% if cycle.is_open %}<div class="ca-cycle-detail-actions">
                   <a class="button" href="{% url 'planejamento_objetivo_departamental_edit' departamental.id %}">Editar</a>
                   <form method="post" action="{% url 'planejamento_objetivo_departamental_delete' departamental.id %}" onsubmit="return confirm('Eliminar este objetivo departamental?');">
                     {% csrf_token %}
                     <button class="button ca-delete-button" type="submit">Eliminar</button>
                   </form>
-                </div>
+                </div>{% endif %}
               </div>
 
               <div class="panel-title" style="margin-top: 14px;">
@@ -107,20 +108,20 @@
                   <span class="eyebrow">INDIVIDUAIS</span>
                   <h5>Objetivos individuais</h5>
                 </div>
-                {% if departamental.is_approved %}<a class="button" href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">Adicionar individual <span>＋</span></a>{% endif %}
+                {% if cycle.is_open and departamental.is_approved %}<a class="button" href="{% url 'planejamento_objetivo_individual_create' departamental.id %}">Adicionar individual <span>＋</span></a>{% endif %}
               </div>
 
               {% for individual in departamental.individual_objectives.all %}
                 <div class="detail-block" style="margin-top: 10px;">
                   <div class="detail-label">{{ individual.user.get_full_name|default:individual.user.username }}</div>
                   <p>{{ individual.description }}</p>
-                  <div class="ca-cycle-detail-actions">
+                  {% if cycle.is_open %}<div class="ca-cycle-detail-actions">
                     {% if individual.automatic_status != 'completed' %}<a class="button" href="{% url 'planejamento_objetivo_individual_edit' individual.id %}">Editar</a>{% endif %}
                     <form method="post" action="{% url 'planejamento_objetivo_individual_delete' individual.id %}" onsubmit="return confirm('Eliminar este objetivo individual?');">
                       {% csrf_token %}
                       <button class="button ca-delete-button" type="submit">Eliminar</button>
                     </form>
-                  </div>
+                  </div>{% endif %}
                 </div>
               {% empty %}
                 <div class="empty">Nenhum objetivo individual associado.</div>

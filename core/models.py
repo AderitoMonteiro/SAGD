@@ -59,6 +59,12 @@ class Cycle(ActiveRecord):
     def __str__(self):
         return f'{self.name} {self.year}'
 
+    @property
+    def reopen_min_date(self):
+        """Primeiro dia permitido ao prorrogar um ciclo encerrado."""
+        from datetime import timedelta
+        return max(timezone.localdate(), self.end_date) + timedelta(days=1)
+
     def save(self, *args, **kwargs):
         if not self.domain_id:
             open_domain = Domain.objects.filter(type=1).order_by('id').first()
@@ -278,6 +284,10 @@ class InstitutionalObjective(ActiveRecord):
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
 
+    @property
+    def cycle_locked(self):
+        return self.cycle.automatic_status == 'closed'
+
 class Department(ActiveRecord):
     name = models.CharField('nome', max_length=120, unique=True)
     code = models.CharField('código', max_length=30, unique=True)
@@ -439,7 +449,14 @@ class DepartmentObjective(ActiveRecord):
 
     @property
     def can_be_edited(self):
-        return self.automatic_status != 'completed' or self.approval_status == 'rejected'
+        return (
+            not self.cycle_locked
+            and (self.automatic_status != 'completed' or self.approval_status == 'rejected')
+        )
+
+    @property
+    def cycle_locked(self):
+        return self.institutional_objective.cycle.automatic_status == 'closed'
 
     @property
     def has_admin_feedback(self):
@@ -508,6 +525,10 @@ class IndividualObjective(ActiveRecord):
     @property
     def automatic_status_display(self):
         return dict(self.STATUS_CHOICES)[self.automatic_status]
+
+    @property
+    def cycle_locked(self):
+        return self.department_objective.institutional_objective.cycle.automatic_status == 'closed'
 
 
     @property

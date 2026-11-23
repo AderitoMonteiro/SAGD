@@ -19,11 +19,16 @@ def navigation_permissions(request):
         and not user.is_superuser
         and user.groups.filter(name='Colaborador').exists()
     )
+    is_admin_user = (
+        user.is_authenticated
+        and (user.is_superuser or user.groups.filter(name='Administrador').exists())
+    )
     has_no_group_user = user.is_authenticated and not user.is_superuser and not user.groups.exists()
     return {
         'is_council_user': is_council_user,
         'is_manager_user': is_manager_user,
         'is_hr_user': is_hr_user,
         'is_collaborator_user': is_collaborator_user,
+        'is_admin_user': is_admin_user,
         'has_no_group_user': has_no_group_user,
     }

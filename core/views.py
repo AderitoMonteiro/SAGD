@@ -84,8 +84,8 @@ def individual_objective_percentage(request):
         percentage = Decimal(value)
     except InvalidOperation:
         return None, 'Indique uma percentagem válida.'
-    if percentage < 0 or percentage > 100:
-        return None, 'A percentagem deve estar entre 0 e 100.'
+    if percentage <= 0 or percentage > 100:
+        return None, 'A percentagem deve ser maior que 0 e não pode ultrapassar 100.'
     if percentage.as_tuple().exponent < -2:
         return None, 'A percentagem pode ter no máximo duas casas decimais.'
     return percentage, None
@@ -171,6 +171,17 @@ def cycle_domain_for_type(domain_type):
     )
 
 
+def block_closed_cycle(request, cycle):
+    """Regista a mensagem comum e informa se o ciclo está bloqueado."""
+    if cycle.automatic_status != 'closed':
+        return False
+    messages.error(
+        request,
+        'Este ciclo está encerrado. Os objetivos e tarefas estão disponíveis apenas para consulta.',
+    )
+    return True
+
+
 def cycle_list_context(request):
     years = list(Cycle.objects.order_by('-year').values_list('year', flat=True).distinct())
     selected_year = request.GET.get('year', '').strip()
@@ -190,6 +201,13 @@ def cycle_list_context(request):
 
 def is_management(user):
     return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Gestor']).exists()
+
+
+def is_administrator(user):
+    """Administração operacional; não inclui Conselho, RH ou Gestor."""
+    return user.is_authenticated and (
+        user.is_superuser or user.groups.filter(name='Administrador').exists()
+    )
 
 
 def is_council(user):
@@ -1042,9 +1060,42 @@ def planejamento_ciclo_toggle_status(request, cycle_id):
     if target_type == current_type:
         messages.info(request, 'O ciclo já se encontra nesse estado.')
         return redirect('planejamento_ciclo_create')
+    if target_type == 1:
+        if not is_administrator(request.user):
+            messages.error(request, 'Apenas a Administração pode reabrir um ciclo.')
+            return redirect('planejamento_ciclo_create')
+        end_value = request.POST.get('new_end_date', '').strip()
+        reason = request.POST.get('reopen_reason', '').strip()
+        try:
+            new_end_date = date.fromisoformat(end_value)
+        except (TypeError, ValueError):
+            messages.error(request, 'Indique uma nova data de encerramento válida.')
+            return redirect('planejamento_ciclo_create')
+        minimum_end_date = max(timezone.localdate(), cycle.end_date)
+        if new_end_date <= minimum_end_date:
+            messages.error(
+                request,
+                'A nova data deve ser posterior à data atual e à data de encerramento anterior.',
+            )
+            return redirect('planejamento_ciclo_create')
+        if not reason:
+            messages.error(request, 'Indique a justificação para reabrir o ciclo.')
+            return redirect('planejamento_ciclo_create')
+        if len(reason) > 500:
+            messages.error(request, 'A justificação não pode ultrapassar 500 caracteres.')
+            return redirect('planejamento_ciclo_create')
+        previous_end_date = cycle.end_date
+        cycle.end_date = new_end_date
+        cycle._audit_description = (
+            f'Ciclo reaberto e prorrogado de {previous_end_date:%d/%m/%Y} para '
+            f'{new_end_date:%d/%m/%Y}. Justificação: {reason}'
+        )
     cycle.domain = cycle_domain_for_type(target_type)
     cycle.status = 'closed' if target_type == 2 else 'active'
-    cycle.save(update_fields=['domain', 'status'])
+    update_fields = ['domain', 'status']
+    if target_type == 1:
+        update_fields.append('end_date')
+    cycle.save(update_fields=update_fields)
     action = 'concluído' if target_type == 2 else 'reaberto'
     messages.success(request, f'Ciclo {action} com sucesso.')
     return redirect('planejamento_ciclo_create')
@@ -1100,6 +1151,8 @@ def planejamento_objetivo_institucional_create(request, cycle_id):
         messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
         return redirect('planejamento_objetivo_institucional_menu')
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if block_closed_cycle(request, cycle):
+        return redirect('planejamento_ciclo_detail', cycle_id=cycle.id)
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
         if not description:
@@ -1118,10 +1171,11 @@ def planejamento_objetivo_departamental_menu(request):
     )
     for item in institucionais:
         item.available_department_percentage = available_department_percentage(item)
+    institucionais_abertos = [item for item in institucionais if not item.cycle_locked]
     institucional = next((
-        item for item in institucionais
+        item for item in institucionais_abertos
         if item.cycle.start_date <= timezone.localdate() <= item.cycle.end_date
-    ), None) or (institucionais[0] if institucionais else None)
+    ), None) or (institucionais_abertos[0] if institucionais_abertos else None)
     if request.method == 'POST' and not can_manage_department_objectives(request.user):
         messages.error(request, 'Acesso apenas de consulta a estes objetivos.')
         return redirect('planejamento_objetivo_departamental_menu')
@@ -1136,6 +1190,8 @@ def planejamento_objetivo_departamental_menu(request):
             messages.error(request, 'Associe um departamento ao utilizador antes de criar o objetivo.')
             return redirect('planejamento_objetivo_departamental_menu')
         institucional = get_object_or_404(InstitutionalObjective, pk=institutional_objective_id)
+        if block_closed_cycle(request, institucional.cycle):
+            return redirect('planejamento_objetivo_departamental_menu')
         percentagem, percentage_error = individual_objective_percentage(request)
         if percentage_error:
             messages.error(request, percentage_error.replace('na tarefa', 'no objetivo departamental'))
@@ -1188,6 +1244,7 @@ def planejamento_objetivo_departamental_menu(request):
         'department_completed_total': department_completed_total,
         'institucional': institucional,
         'institucionais': institucionais,
+        'institucionais_abertos': institucionais_abertos,
         'read_only': not can_manage_department_objectives(request.user),
     })
 
@@ -1198,6 +1255,8 @@ def planejamento_objetivo_institucional_edit(request, objetivo_id):
         messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
         return redirect('planejamento_objetivo_institucional_menu')
     objetivo = get_object_or_404(InstitutionalObjective, pk=objetivo_id)
+    if block_closed_cycle(request, objetivo.cycle):
+        return redirect('planejamento_objetivo_institucional_menu')
     if not objetivo.domain_id or objetivo.domain.type != 1:
         messages.error(request, 'Apenas objetivos abertos podem ser editados.')
         return redirect('planejamento_objetivo_institucional_menu')
@@ -1218,6 +1277,8 @@ def planejamento_objetivo_institucional_delete(request, objetivo_id):
         messages.error(request, 'O grupo Administração possui apenas acesso de consulta aos objetivos institucionais.')
         return redirect('planejamento_objetivo_institucional_menu')
     objetivo = get_object_or_404(InstitutionalObjective, pk=objetivo_id)
+    if block_closed_cycle(request, objetivo.cycle):
+        return redirect('planejamento_objetivo_institucional_menu')
     if not objetivo.domain_id or objetivo.domain.type != 1:
         messages.error(request, 'Apenas objetivos abertos podem ser eliminados.')
         return redirect('planejamento_objetivo_institucional_menu')
@@ -1239,6 +1300,8 @@ def planejamento_objetivo_institucional_toggle_status(request, objetivo_id):
     objetivo = get_object_or_404(
         InstitutionalObjective.objects.select_related('domain'), pk=objetivo_id
     )
+    if block_closed_cycle(request, objetivo.cycle):
+        return redirect('planejamento_objetivo_institucional_menu')
     if request.method != 'POST':
         return redirect('planejamento_objetivo_institucional_menu')
 
@@ -1263,6 +1326,8 @@ def planejamento_objetivo_institucional_toggle_status(request, objetivo_id):
 @department_objective_write_required
 def planejamento_objetivo_departamental_create(request, objetivo_id):
     institucional = get_object_or_404(InstitutionalObjective, pk=objetivo_id)
+    if block_closed_cycle(request, institucional.cycle):
+        return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
         department = user_department(request.user)
@@ -1300,6 +1365,8 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
         ),
         pk=objetivo_id,
     )
+    if block_closed_cycle(request, objetivo.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_departamental_menu')
     if not objetivo.can_be_edited:
         messages.error(request, 'Apenas objetivos em andamento ou rejeitados podem ser editados.')
         return redirect('planejamento_objetivo_departamental_menu')
@@ -1346,6 +1413,8 @@ def planejamento_objetivo_departamental_delete(request, objetivo_id):
     objetivo = get_object_or_404(
         department_objectives_for_user(request.user), pk=objetivo_id
     )
+    if block_closed_cycle(request, objetivo.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_departamental_menu')
     if not objetivo.domain_id or objetivo.domain.type != 1:
         messages.error(request, 'Apenas objetivos abertos podem ser eliminados.')
         return redirect('planejamento_objetivo_departamental_menu')
@@ -1368,6 +1437,8 @@ def planejamento_objetivo_departamental_toggle_status(request, objetivo_id):
         ),
         pk=objetivo_id,
     )
+    if block_closed_cycle(request, objetivo.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_departamental_menu')
     if request.method != 'POST':
         return redirect('planejamento_objetivo_departamental_menu')
 
@@ -1404,6 +1475,8 @@ def planejamento_objetivo_departamental_aprovacao(request, objetivo_id):
         DepartmentObjective.objects.prefetch_related('approval_history__domain'),
         pk=objetivo_id,
     )
+    if block_closed_cycle(request, objetivo.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_departamental_menu')
     decision = request.POST.get('decision')
     if decision not in {'approve', 'reject'}:
         messages.error(request, 'Selecione Aprovar ou Rejeitar.')
@@ -1461,6 +1534,8 @@ def planejamento_objetivo_individual_create(request, objetivo_id):
         ),
         pk=objetivo_id,
     )
+    if block_closed_cycle(request, departamental.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_individual_menu')
     if not departamental.is_approved:
         messages.error(
             request,
@@ -1529,7 +1604,17 @@ def planejamento_objetivo_individual_menu(request):
     )
     users = individual_assignees_for_user(request.user)
     departamentos = list(departamentos_queryset)
-    for department_objective in departamentos:
+    if is_council(request.user):
+        departamentos_opcoes = list(
+            DepartmentObjective.objects.select_related(
+                'institutional_objective__cycle', 'department',
+            ).prefetch_related('approval_history__domain').order_by(
+                'department__name', '-date_created',
+            )
+        )
+    else:
+        departamentos_opcoes = departamentos
+    for department_objective in departamentos_opcoes:
         department_objective.available_percentage = available_individual_percentage(
             department_objective,
             request.user,
@@ -1537,7 +1622,16 @@ def planejamento_objetivo_individual_menu(request):
         cycle = department_objective.institutional_objective.cycle
         department_objective.task_start_min = cycle.start_date + timedelta(days=1)
         department_objective.task_end_max = cycle.end_date - timedelta(days=1)
-    departamento_ativo = next((item for item in departamentos if item.automatic_status == 'active'), None)
+    if is_council(request.user):
+        for department_objective in departamentos:
+            department_objective.available_percentage = available_individual_percentage(
+                department_objective, request.user,
+            )
+            cycle = department_objective.institutional_objective.cycle
+            department_objective.task_start_min = cycle.start_date + timedelta(days=1)
+            department_objective.task_end_max = cycle.end_date - timedelta(days=1)
+    departamentos_abertos = [item for item in departamentos if not item.cycle_locked]
+    departamento_ativo = next((item for item in departamentos_abertos if item.automatic_status == 'active'), None)
     if request.method == 'POST' and not can_manage_operational_objectives(request.user):
         messages.error(request, 'Acesso apenas de consulta a estes objetivos.')
         return redirect('planejamento_objetivo_individual_menu')
@@ -1560,6 +1654,8 @@ def planejamento_objetivo_individual_menu(request):
             messages.error(request, 'Selecione o objetivo departamental e o utilizador.')
             return redirect('planejamento_objetivo_individual_menu')
         department = get_object_or_404(departamentos_queryset, pk=department_id)
+        if block_closed_cycle(request, department.institutional_objective.cycle):
+            return redirect('planejamento_objetivo_individual_menu')
         if not department.is_approved:
             messages.error(request, 'Selecione um objetivo departamental aprovado.')
             return redirect('planejamento_objetivo_individual_menu')
@@ -1629,6 +1725,8 @@ def planejamento_objetivo_individual_menu(request):
         'individual_active_total': individual_active_total,
         'individual_completed_total': individual_completed_total,
         'departamentos': departamentos,
+        'departamentos_opcoes': departamentos_opcoes,
+        'departamentos_abertos': departamentos_abertos,
         'users': users,
         'assignee_label': 'Gestor' if is_council(request.user) else 'Responsável',
         'departamento_ativo': departamento_ativo,
@@ -1641,6 +1739,8 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
     objetivo = get_object_or_404(
         individual_objectives_for_user(request.user), pk=objetivo_id
     )
+    if block_closed_cycle(request, objetivo.department_objective.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_individual_menu')
     if objetivo.automatic_status == 'completed':
         messages.error(request, 'Uma tarefa individual concluída não pode ser editada.')
         return redirect('planejamento_objetivo_individual_menu')
@@ -1712,6 +1812,8 @@ def planejamento_objetivo_individual_delete(request, objetivo_id):
     objetivo = get_object_or_404(
         individual_objectives_for_user(request.user), pk=objetivo_id
     )
+    if block_closed_cycle(request, objetivo.department_objective.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_individual_menu')
     if request.method == 'POST':
         cycle_id = objetivo.department_objective.institutional_objective.cycle_id
         objetivo.delete()
@@ -1985,6 +2087,8 @@ def cycle_detail(request, cycle_id):
 @planning_required
 def objective_create(request, cycle_id):
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if block_closed_cycle(request, cycle):
+        return redirect('cycle_detail', cycle_id=cycle.id)
     users = get_user_model().objects.filter(is_active=True).order_by('first_name', 'username')
     if request.method == 'POST':
         category = request.POST.get('category', 'individual')
@@ -2000,6 +2104,8 @@ def objective_create(request, cycle_id):
 @login_required
 def follow_up_create(request, cycle_id):
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if block_closed_cycle(request, cycle):
+        return redirect('cycle_detail', cycle_id=cycle.id)
     if request.method == 'POST':
         employee_id = request.POST.get('employee') if is_management(request.user) else request.user.id
         FollowUp.objects.create(cycle=cycle, employee_id=employee_id, author=request.user, entry_type=request.POST.get('entry_type', 'evidence'), title=request.POST.get('title', '').strip(), content=request.POST.get('content', '').strip(), next_step=request.POST.get('next_step', '').strip())

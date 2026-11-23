@@ -27,6 +27,6 @@ def request_metadata(request=None):
         'utilizador': user if getattr(user, 'is_authenticated', False) else None,
         'endereco_ip': ip_address or None,
         'user_agent': request.META.get('HTTP_USER_AGENT', '')[:2000],
-        'rota': request.path[:255],
-        'metodo_http': request.method[:10],
+        'rota': (getattr(request, 'path', '') or '')[:255],
+        'metodo_http': (getattr(request, 'method', '') or '')[:10],
     }
