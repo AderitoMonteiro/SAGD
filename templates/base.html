@@ -68,7 +68,7 @@
   <link rel="stylesheet" href="{% static 'css/logout.css' %}">
   <link rel="stylesheet" href="{% static 'css/navigation-loader.css' %}">
   <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
-  <link rel="stylesheet" href="{% static 'css/admin-approval-notifications.css' %}?v=2">
+  <link rel="stylesheet" href="{% static 'css/admin-approval-notifications.css' %}?v=3">
 </head>
 <body>
 <script>
@@ -120,6 +120,47 @@
     document.querySelectorAll('[data-toast]').forEach(function (toast) {
       window.setTimeout(function () { dismissToast(toast); }, 4500);
     });
+
+    function csrfToken() {
+      var match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function activateNotificationReadTracking(root) {
+      root.querySelectorAll('[data-system-notifications]').forEach(function (center) {
+        if (center.dataset.readTrackingReady === 'true') return;
+        center.dataset.readTrackingReady = 'true';
+        center.addEventListener('toggle', function () {
+          if (!center.open || center.dataset.notificationsRead === 'true') return;
+          var keys = Array.from(center.querySelectorAll('[data-notification-key]')).map(function (item) {
+            return item.dataset.notificationKey;
+          }).filter(Boolean);
+          if (!keys.length) return;
+          center.dataset.notificationsRead = 'true';
+          var body = new URLSearchParams();
+          keys.forEach(function (key) { body.append('keys', key); });
+          fetch(center.dataset.readUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'X-CSRFToken': (center.querySelector('[name="csrfmiddlewaretoken"]') || {}).value || csrfToken(),
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            body: body.toString()
+          }).then(function (response) {
+            if (!response.ok) throw new Error('Falha ao marcar notificações');
+            var badge = center.querySelector('.admin-notification-badge');
+            var counter = center.querySelector('.admin-notification-panel header b');
+            if (badge) badge.remove();
+            if (counter) counter.remove();
+          }).catch(function () {
+            center.dataset.notificationsRead = 'false';
+          });
+        });
+      });
+    }
+
+    activateNotificationReadTracking(document);
 
     function allModals() {
       return document.querySelectorAll('[data-cycle-modal], [data-objective-modal], [data-department-modal], [data-individual-modal]');
@@ -196,6 +237,7 @@
       currentContent.replaceWith(nextContent);
       expandActiveSidebarSubmenu();
       applyIndividualCycleBounds(document);
+      activateNotificationReadTracking(document);
       document.title = nextDocument.title;
       updateActiveNavigation(new URL(url, window.location.href).href);
       if (pushState) window.history.pushState({ url: url }, '', url);

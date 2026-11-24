@@ -10,9 +10,11 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 
 from .models import (AprovacaoTarefa, Cycle, Department, DepartmentObjective, Domain, Evaluation, FollowUp, IndividualObjective,
-                    InstitutionalObjective, Objective, RegistoOcorrencia, UserDepartment, Validation)
+                    InstitutionalObjective, Objective, RegistoOcorrencia, SystemNotificationRead, UserDepartment, Validation)
 
 
 PHASES = [
@@ -28,6 +30,34 @@ PHASES = [
 def paginate_records(request, records, parameter='page'):
     """Apresenta listagens em blocos fixos de dez registos."""
     return Paginator(records, 10).get_page(request.GET.get(parameter))
+
+
+@login_required
+@require_POST
+def system_notifications_mark_read(request):
+    keys = [key[:200] for key in request.POST.getlist('keys') if key.strip()]
+    if not keys:
+        return JsonResponse({'marked': 0})
+
+    from .notification_center import administration_notifications, department_notifications
+
+    if is_council(request.user):
+        current_notifications = administration_notifications(request.user)
+    elif is_manager(request.user) or is_hr(request.user):
+        current_notifications = department_notifications(request.user)
+    else:
+        current_notifications = []
+
+    allowed_keys = {item['key'] for item in current_notifications}
+    keys = list(dict.fromkeys(key for key in keys if key in allowed_keys))
+    SystemNotificationRead.objects.bulk_create(
+        [
+            SystemNotificationRead(user=request.user, notification_key=key)
+            for key in keys
+        ],
+        ignore_conflicts=True,
+    )
+    return JsonResponse({'marked': len(keys)})
 
 
 def individual_objective_dates(request):
@@ -173,13 +203,23 @@ def cycle_domain_for_type(domain_type):
 
 def block_closed_cycle(request, cycle):
     """Regista a mensagem comum e informa se o ciclo está bloqueado."""
-    if cycle.automatic_status != 'closed':
+    if cycle.automatic_status != 'closed' or can_bypass_cycle_lock(request.user):
         return False
     messages.error(
         request,
         'Este ciclo está encerrado. Os objetivos e tarefas estão disponíveis apenas para consulta.',
     )
     return True
+
+
+def can_bypass_cycle_lock(user):
+    """Administração mantém poderes de gestão mesmo após o fecho do ciclo."""
+    return user.is_authenticated and (
+        user.is_superuser
+        or user.groups.filter(
+            name__in=['Administrador', 'Conselho de Administração']
+        ).exists()
+    )
 
 
 def cycle_list_context(request):
@@ -1171,7 +1211,10 @@ def planejamento_objetivo_departamental_menu(request):
     )
     for item in institucionais:
         item.available_department_percentage = available_department_percentage(item)
-    institucionais_abertos = [item for item in institucionais if not item.cycle_locked]
+    institucionais_abertos = [
+        item for item in institucionais
+        if not item.cycle_locked or can_bypass_cycle_lock(request.user)
+    ]
     institucional = next((
         item for item in institucionais_abertos
         if item.cycle.start_date <= timezone.localdate() <= item.cycle.end_date
@@ -1385,7 +1428,7 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
     )
     if block_closed_cycle(request, objetivo.institutional_objective.cycle):
         return redirect('planejamento_objetivo_departamental_menu')
-    if not objetivo.can_be_edited:
+    if not objetivo.can_be_edited and not can_bypass_cycle_lock(request.user):
         messages.error(request, 'Apenas objetivos em andamento ou rejeitados podem ser editados.')
         return redirect('planejamento_objetivo_departamental_menu')
     if request.method == 'POST':
@@ -1648,7 +1691,10 @@ def planejamento_objetivo_individual_menu(request):
             cycle = department_objective.institutional_objective.cycle
             department_objective.task_start_min = cycle.start_date + timedelta(days=1)
             department_objective.task_end_max = cycle.end_date - timedelta(days=1)
-    departamentos_abertos = [item for item in departamentos if not item.cycle_locked]
+    departamentos_abertos = [
+        item for item in departamentos
+        if not item.cycle_locked or can_bypass_cycle_lock(request.user)
+    ]
     departamento_ativo = next((item for item in departamentos_abertos if item.automatic_status == 'active'), None)
     if request.method == 'POST' and not can_manage_operational_objectives(request.user):
         messages.error(request, 'Acesso apenas de consulta a estes objetivos.')
@@ -1759,7 +1805,7 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
     )
     if block_closed_cycle(request, objetivo.department_objective.institutional_objective.cycle):
         return redirect('planejamento_objetivo_individual_menu')
-    if objetivo.automatic_status == 'completed':
+    if objetivo.automatic_status == 'completed' and not can_bypass_cycle_lock(request.user):
         messages.error(request, 'Uma tarefa individual concluída não pode ser editada.')
         return redirect('planejamento_objetivo_individual_menu')
     if request.method == 'POST':
@@ -2065,6 +2111,8 @@ def cycle_create(request):
 @planning_required
 def cycle_edit(request, cycle_id):
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if block_closed_cycle(request, cycle):
+        return redirect('cycle_detail', cycle_id=cycle.id)
     if request.method == 'POST':
         cycle.name = request.POST.get('name', '').strip()
         cycle.year = request.POST.get('year', cycle.year)
@@ -2080,6 +2128,8 @@ def cycle_edit(request, cycle_id):
 @planning_required
 def cycle_delete(request, cycle_id):
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if block_closed_cycle(request, cycle):
+        return redirect('cycle_detail', cycle_id=cycle.id)
     if request.method == 'POST':
         cycle.delete()
         messages.success(request, 'Ciclo removido com sucesso.')
@@ -2099,7 +2149,7 @@ def cycle_detail(request, cycle_id):
     if not is_management(request.user):
         objectives = objectives.filter(employee=request.user)
         follow_ups = follow_ups.filter(employee=request.user)
-    return render(request, 'shared/cycle_detail.html', {'cycle': cycle, 'evaluations': evaluations, 'objectives': objectives, 'follow_ups': follow_ups, 'validations': validations, 'phases': PHASES, 'can_manage': is_management(request.user), 'can_plan': can_plan(request.user)})
+    return render(request, 'shared/cycle_detail.html', {'cycle': cycle, 'evaluations': evaluations, 'objectives': objectives, 'follow_ups': follow_ups, 'validations': validations, 'phases': PHASES, 'can_manage': is_management(request.user), 'can_plan': can_plan(request.user), 'can_interact_with_cycle': cycle.automatic_status != 'closed' or can_bypass_cycle_lock(request.user)})
 
 
 @planning_required
@@ -2136,6 +2186,8 @@ def follow_up_create(request, cycle_id):
 @management_required
 def validation_create(request, cycle_id):
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if block_closed_cycle(request, cycle):
+        return redirect('cycle_detail', cycle_id=cycle.id)
     evaluations = cycle.evaluations.select_related('employee')
     users = get_user_model().objects.filter(is_active=True).order_by('first_name', 'username')
     if request.method == 'POST':
@@ -2148,6 +2200,8 @@ def validation_create(request, cycle_id):
 @management_required
 def validation_update(request, validation_id):
     validation = get_object_or_404(Validation, pk=validation_id)
+    if block_closed_cycle(request, validation.cycle):
+        return redirect('cycle_detail', cycle_id=validation.cycle_id)
     if request.method == 'POST':
         validation.status = request.POST.get('status', validation.status)
         validation.comment = request.POST.get('comment', '').strip()
@@ -2169,6 +2223,8 @@ def evaluation_detail(request, evaluation_id):
 @management_required
 def evaluation_create(request, cycle_id):
     cycle = get_object_or_404(Cycle, pk=cycle_id)
+    if block_closed_cycle(request, cycle):
+        return redirect('cycle_detail', cycle_id=cycle.id)
     users = get_user_model().objects.filter(is_active=True).order_by('first_name', 'username')
     if request.method == 'POST':
         Evaluation.objects.create(
@@ -2188,6 +2244,8 @@ def evaluation_edit(request, evaluation_id):
     evaluation = get_object_or_404(Evaluation, pk=evaluation_id)
     if not is_management(request.user) and evaluation.employee_id != request.user.id:
         return get_object_or_404(Evaluation, pk=-1)
+    if block_closed_cycle(request, evaluation.cycle):
+        return redirect('evaluation_detail', evaluation_id=evaluation.id)
     if request.method == 'POST':
         evaluation.self_score = request.POST.get('self_score') or None
         evaluation.feedback = request.POST.get('feedback', '').strip()
@@ -2205,6 +2263,8 @@ def evaluation_edit(request, evaluation_id):
 @management_required
 def evaluation_delete(request, evaluation_id):
     evaluation = get_object_or_404(Evaluation, pk=evaluation_id)
+    if block_closed_cycle(request, evaluation.cycle):
+        return redirect('evaluation_detail', evaluation_id=evaluation.id)
     if request.method == 'POST':
         cycle_id = evaluation.cycle_id
         evaluation.delete()

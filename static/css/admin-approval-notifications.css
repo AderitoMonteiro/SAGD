@@ -144,6 +144,16 @@
   color: #b66b13;
 }
 
+.admin-notification-mark-approval-approved {
+  background: #dff4ec;
+  color: #17725c;
+}
+
+.admin-notification-mark-approval-rejected {
+  background: #ffe8e5;
+  color: #c64036;
+}
+
 .admin-notification-list a > span:last-child {
   min-width: 0;
   display: grid;

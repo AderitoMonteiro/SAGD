@@ -1,5 +1,6 @@
-{% if is_council_user %}
-<details class="admin-notification">
+{% if system_notifications_enabled %}
+<details class="admin-notification" data-system-notifications data-read-url="{% url 'system_notifications_mark_read' %}">
+  <form hidden data-notification-read-form>{% csrf_token %}</form>
   <summary class="admin-notification-trigger" aria-label="Abrir notificações" title="Notificações">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
@@ -18,7 +19,7 @@
     {% if system_notifications %}
       <div class="admin-notification-list">
         {% for notification in system_notifications %}
-          <a href="{{ notification.url }}" data-spa-link data-notification-kind="{{ notification.category }}">
+          <a href="{{ notification.url }}" data-spa-link data-notification-kind="{{ notification.category }}" data-notification-key="{{ notification.key }}">
             <span class="admin-notification-mark admin-notification-mark-{{ notification.category }}">{{ notification.icon }}</span>
             <span>
               <strong>{{ notification.title }}</strong>

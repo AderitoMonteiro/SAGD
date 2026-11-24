@@ -33,6 +33,29 @@ class ActiveRecord(models.Model):
     class Meta:
         abstract = True
 
+
+class SystemNotificationRead(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='read_system_notifications',
+        verbose_name='utilizador',
+    )
+    notification_key = models.CharField('chave da notificação', max_length=200)
+    read_at = models.DateTimeField('visualizada em', auto_now_add=True)
+
+    class Meta:
+        db_table = 'system_notification_reads'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'notification_key'],
+                name='uniq_system_notification_read_user_key',
+            ),
+        ]
+        ordering = ['-read_at']
+        verbose_name = 'notificação visualizada'
+        verbose_name_plural = 'notificações visualizadas'
+
     def delete(self, using=None, keep_parents=False):
         self.is_active = False
         self.save(using=using, update_fields=['is_active'])
