@@ -1219,14 +1219,30 @@ def planejamento_objetivo_departamental_menu(request):
     department_completed_total = sum(
         objective.automatic_status == 'completed' for objective in objective_list
     )
-    department_active_total = department_total - department_completed_total
-    department_filter = request.GET.get('status', 'all') if is_manager(request.user) else 'all'
-    if department_filter not in {'all', 'active', 'completed'}:
+    department_active_total = sum(
+        objective.automatic_status != 'completed'
+        and objective.approval_status == 'approved'
+        for objective in objective_list
+    )
+    department_pending_approval_total = sum(
+        objective.approval_status == 'pending_approval' for objective in objective_list
+    )
+    # A filtragem pertence à listagem e deve estar disponível para qualquer
+    # perfil que tenha acesso a ela; o queryset já aplica o escopo por grupo.
+    can_filter_department_objectives = True
+    department_filter = request.GET.get('status', 'all')
+    if department_filter not in {'all', 'active', 'pending_approval', 'completed'}:
         department_filter = 'all'
     if department_filter == 'active':
         objetivos = [
             objective for objective in objective_list
             if objective.automatic_status != 'completed'
+            and objective.approval_status == 'approved'
+        ]
+    elif department_filter == 'pending_approval':
+        objetivos = [
+            objective for objective in objective_list
+            if objective.approval_status == 'pending_approval'
         ]
     elif department_filter == 'completed':
         objetivos = [
@@ -1241,7 +1257,9 @@ def planejamento_objetivo_departamental_menu(request):
         'department_filter': department_filter,
         'department_total': department_total,
         'department_active_total': department_active_total,
+        'department_pending_approval_total': department_pending_approval_total,
         'department_completed_total': department_completed_total,
+        'can_filter_department_objectives': can_filter_department_objectives,
         'institucional': institucional,
         'institucionais': institucionais,
         'institucionais_abertos': institucionais_abertos,

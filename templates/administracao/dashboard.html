@@ -8,6 +8,7 @@
     <main class="main menu-main">
       <div class="topbar">
         <div class="breadcrumb">SAGD <span>/</span> <strong>Início</strong></div>
+        {% include 'includes/admin_approval_notifications.html' %}
       </div>
       <div class="dashboard-content">
         <div class="dashboard-heading">
@@ -23,8 +24,18 @@
               primeiro ciclo{% endif %}</h2>
             <p>{% if active_cycle %}{{ active_cycle.start_date|date:'d/m/Y' }} a {{ active_cycle.end_date|date:'d/m/Y' }} · {{ active_cycle.automatic_status_display }}{% else %}Defina o período que vai orientar os objetivos
               da organização.{% endif %}</p>
-          </div>{% if active_cycle %}<a class="button" href="{% url 'planejamento_ciclo_create' %}" data-spa-link>Gerir
-            ciclos <span>→</span></a>{% else %}<a class="button" href="{% url 'planejamento_ciclo_create' %}"
+          </div>{% if active_cycle %}<div class="dashboard-cycle-actions">
+            <button class="button dashboard-report-placeholder" type="button" title="Funcionalidade em preparação">
+              Relatório do ciclo
+              <svg class="dashboard-report-pdf-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 2h8l4 4v16H6z"/>
+                <path d="M14 2v5h5"/>
+                <text x="8" y="17">PDF</text>
+              </svg>
+            </button>
+            <a class="button" href="{% url 'planejamento_ciclo_create' %}" data-spa-link>Gerir
+              ciclos <span>→</span></a>
+          </div>{% else %}<a class="button" href="{% url 'planejamento_ciclo_create' %}"
             data-spa-link>Criar ciclo <span>→</span></a>{% endif %}
         </section>
         <div class="dashboard-stats">

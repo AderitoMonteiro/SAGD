@@ -1,0 +1,42 @@
+.dashboard-cycle-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-cycle-banner .dashboard-report-placeholder {
+  background-color: #72d8bc;
+  color: #0b315f;
+  border: 1px solid #72d8bc;
+}
+
+.dashboard-cycle-banner .dashboard-report-placeholder:hover {
+  background-color: #8be2ca;
+  border-color: #8be2ca;
+}
+
+.dashboard-report-pdf-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+
+.dashboard-report-pdf-icon text {
+  fill: #ef4444;
+  stroke: none;
+  font: 700 5px 'DM Sans', sans-serif;
+  letter-spacing: .2px;
+}
+
+@media (max-width: 600px) {
+  .dashboard-cycle-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

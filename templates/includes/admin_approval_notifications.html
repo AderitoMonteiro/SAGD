@@ -1,0 +1,38 @@
+{% if is_council_user %}
+<details class="admin-notification">
+  <summary class="admin-notification-trigger" aria-label="Abrir notificações" title="Notificações">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+      <path d="M10 21h4"/>
+    </svg>
+    {% if system_notification_count %}<span class="admin-notification-badge">{{ system_notification_count }}</span>{% endif %}
+  </summary>
+  <div class="admin-notification-panel">
+    <header>
+      <div>
+        <span>NOTIFICAÇÕES</span>
+        <strong>Centro de notificações</strong>
+      </div>
+      {% if system_notification_count %}<b>{{ system_notification_count }}</b>{% endif %}
+    </header>
+    {% if system_notifications %}
+      <div class="admin-notification-list">
+        {% for notification in system_notifications %}
+          <a href="{{ notification.url }}" data-spa-link data-notification-kind="{{ notification.category }}">
+            <span class="admin-notification-mark admin-notification-mark-{{ notification.category }}">{{ notification.icon }}</span>
+            <span>
+              <strong>{{ notification.title }}</strong>
+              <small>{{ notification.message|truncatechars:75 }}</small>
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="admin-notification-empty">
+        <span>✓</span>
+        <p>Não existem novas notificações.</p>
+      </div>
+    {% endif %}
+  </div>
+</details>
+{% endif %}
