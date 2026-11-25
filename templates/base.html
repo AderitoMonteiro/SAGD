@@ -68,6 +68,7 @@
   <link rel="stylesheet" href="{% static 'css/logout.css' %}">
   <link rel="stylesheet" href="{% static 'css/navigation-loader.css' %}">
   <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+  <link rel="stylesheet" href="{% static 'css/task-completion-confirmation.css' %}?v=1">
   <link rel="stylesheet" href="{% static 'css/admin-approval-notifications.css' %}?v=3">
 </head>
 <body>
@@ -77,6 +78,7 @@
   }());
 </script>
 {% block body %}{% endblock %}
+{% include 'includes/task_completion_confirmation.html' %}
 {% if messages %}
   <div class="toast-stack" aria-live="polite" aria-atomic="true">
     {% for message in messages %}
@@ -92,6 +94,36 @@
 <script>
   (function () {
     var modalTypes = ['cycle', 'objective', 'department', 'individual'];
+    var completionDialog = document.getElementById('task-completion-confirmation');
+    var pendingCompletion = null;
+    var confirmedCompletion = null;
+
+    document.addEventListener('submit', function (event) {
+      var form = event.target;
+      if (!form.matches('[data-confirm-task-completion]') || confirmedCompletion === form) return;
+      event.preventDefault();
+      if (completionDialog.open) return;
+      pendingCompletion = { form: form, submitter: event.submitter };
+      var taskCard = form.closest('article');
+      var taskTitle = taskCard && taskCard.querySelector('h3');
+      var taskName = taskTitle && taskTitle.textContent.trim();
+      completionDialog.querySelector('[data-completion-task-name]').textContent =
+        taskName ? '«' + taskName + '»' : 'esta tarefa';
+      completionDialog.returnValue = '';
+      completionDialog.showModal();
+    });
+
+    completionDialog.addEventListener('close', function () {
+      var pending = pendingCompletion;
+      pendingCompletion = null;
+      if (!pending || completionDialog.returnValue !== 'confirm' || !pending.form.isConnected) return;
+      confirmedCompletion = pending.form;
+      try {
+        pending.form.requestSubmit(pending.submitter || undefined);
+      } finally {
+        confirmedCompletion = null;
+      }
+    });
     var navigationLoader = document.querySelector('[data-navigation-loader]');
     // Mantém o carregador visível o bastante para tornar a troca do conteúdo central perceptível.
     var minimumNavigationLoaderTime = 550;
@@ -173,11 +205,39 @@
       document.body.classList.remove('ca-modal-open');
     }
 
+    function syncManagerTaskForm(form) {
+      if (!form) return;
+      var manager = form.elements.user.selectedOptions[0];
+      var department = manager && manager.dataset.department;
+      var objectives = form.elements.department_objective;
+      var matches = Array.from(objectives.options).filter(function (option) {
+        if (!option.value) return false;
+        option.hidden = !department || option.dataset.department !== department;
+        option.disabled = option.hidden || option.dataset.unavailable === 'true';
+        return !option.disabled;
+      });
+      if (!matches.includes(objectives.selectedOptions[0])) {
+        objectives.value = matches.length === 1 ? matches[0].value : '';
+      }
+      var objective = objectives.selectedOptions[0];
+      var balance = objective && objective.dataset.available;
+      form.elements.percentagem.disabled = !balance || Number(balance) <= 0;
+      form.elements.percentagem.max = balance || '0';
+      form.querySelector('button[type="submit"]').disabled = form.elements.percentagem.disabled;
+      form.querySelector('[data-percentage-balance]').textContent = balance
+        ? 'Percentagem disponível: ' + balance.replace('.', ',') + '%.'
+        : !manager || !manager.value ? 'Selecione um Gestor.'
+        : matches.length ? 'Selecione um objetivo do departamento do Gestor.'
+        : 'O Gestor não tem objetivos departamentais elegíveis.';
+      applyIndividualCycleBounds(form);
+    }
+
     function openModal(type, name) {
       closeModals();
       var modal = document.querySelector('[data-' + type + '-modal="' + name + '"]');
       if (!modal) return;
       modal.setAttribute('aria-hidden', 'false');
+      syncManagerTaskForm(modal.querySelector('[data-manager-task-create]'));
       document.body.classList.add('ca-modal-open');
       var input = modal.querySelector('input');
       if (input) input.focus();
@@ -297,6 +357,9 @@
     });
 
     document.addEventListener('change', function (event) {
+      if (event.target.matches('[name="user"], [name="department_objective"]')) {
+        syncManagerTaskForm(event.target.closest('[data-manager-task-create]'));
+      }
       if (event.target.matches('select[name="department_objective"]')) {
         applyIndividualCycleBounds(event.target.closest('form'));
       }

@@ -127,7 +127,9 @@ def available_individual_percentage(
     exclude_objective_id=None,
 ):
     """Saldo percentual ainda disponível num objetivo departamental."""
-    assignee_group = 'Gestor' if is_council(planner) else 'Colaborador'
+    planning_for_managers = is_council(planner)
+    assignee_group = 'Gestor' if planning_for_managers else 'Colaborador'
+    budget = department_objective.percentagem if planning_for_managers else Decimal('100')
     objectives = IndividualObjective.objects.filter(
         department_objective=department_objective,
         user__groups__name=assignee_group,
@@ -135,7 +137,7 @@ def available_individual_percentage(
     if exclude_objective_id:
         objectives = objectives.exclude(pk=exclude_objective_id)
     distributed = objectives.aggregate(total=Sum('percentagem'))['total'] or Decimal('0')
-    return max(Decimal('0'), Decimal('100') - distributed)
+    return max(Decimal('0'), budget - distributed)
 
 
 def validate_available_individual_percentage(
@@ -157,10 +159,11 @@ def validate_available_individual_percentage(
     return None
 
 
-def available_department_percentage(institutional_objective, exclude_objective_id=None):
-    """Saldo percentual ainda disponível num objetivo institucional."""
+def available_department_percentage(institutional_objective, department, exclude_objective_id=None):
+    """Saldo do departamento para o objetivo institucional indicado."""
     objectives = DepartmentObjective.objects.filter(
         institutional_objective=institutional_objective,
+        department=department,
     )
     if exclude_objective_id:
         objectives = objectives.exclude(pk=exclude_objective_id)
@@ -169,12 +172,12 @@ def available_department_percentage(institutional_objective, exclude_objective_i
 
 
 def validate_available_department_percentage(
-    institutional_objective, percentage, exclude_objective_id=None,
+    institutional_objective, percentage, department, exclude_objective_id=None,
 ):
     if percentage is None or percentage <= 0:
         return 'A percentagem aplicada deve ser maior que 0%.'
     available = available_department_percentage(
-        institutional_objective, exclude_objective_id=exclude_objective_id,
+        institutional_objective, department, exclude_objective_id=exclude_objective_id,
     )
     if percentage > available:
         return (
@@ -1206,11 +1209,12 @@ def planejamento_objetivo_institucional_create(request, cycle_id):
 
 @login_required
 def planejamento_objetivo_departamental_menu(request):
+    department = user_department(request.user)
     institucionais = list(
         InstitutionalObjective.objects.select_related('cycle').order_by('-date_created')
     )
     for item in institucionais:
-        item.available_department_percentage = available_department_percentage(item)
+        item.available_department_percentage = available_department_percentage(item, department)
     institucionais_abertos = [
         item for item in institucionais
         if not item.cycle_locked or can_bypass_cycle_lock(request.user)
@@ -1225,7 +1229,6 @@ def planejamento_objetivo_departamental_menu(request):
     if request.method == 'POST':
         description = request.POST.get('description', '').strip()
         institutional_objective_id = request.POST.get('institutional_objective')
-        department = user_department(request.user)
         if not description or not institutional_objective_id or not request.POST.get('percentagem', '').strip():
             messages.error(request, 'Preencha todos os campos obrigatórios do objetivo departamental.')
             return redirect('planejamento_objetivo_departamental_menu')
@@ -1239,7 +1242,7 @@ def planejamento_objetivo_departamental_menu(request):
         if percentage_error:
             messages.error(request, percentage_error.replace('na tarefa', 'no objetivo departamental'))
             return redirect('planejamento_objetivo_departamental_menu')
-        percentage_error = validate_available_department_percentage(institucional, percentagem)
+        percentage_error = validate_available_department_percentage(institucional, percentagem, department)
         if percentage_error:
             messages.error(request, percentage_error)
             return redirect('planejamento_objetivo_departamental_menu')
@@ -1402,7 +1405,7 @@ def planejamento_objetivo_departamental_create(request, objetivo_id):
         if percentage_error:
             messages.error(request, percentage_error.replace('na tarefa', 'no objetivo departamental'))
             return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
-        percentage_error = validate_available_department_percentage(institucional, percentagem)
+        percentage_error = validate_available_department_percentage(institucional, percentagem, department)
         if percentage_error:
             messages.error(request, percentage_error)
             return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
@@ -1415,7 +1418,7 @@ def planejamento_objetivo_departamental_create(request, objetivo_id):
         )
         messages.success(request, 'Objetivo departamental criado.')
         return redirect('planejamento_ciclo_detail', cycle_id=institucional.cycle_id)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': institucional.cycle, 'kind': 'departamental', 'parent': institucional, 'available_percentage': available_department_percentage(institucional), 'editing': False})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': institucional.cycle, 'kind': 'departamental', 'parent': institucional, 'available_percentage': available_department_percentage(institucional, user_department(request.user)), 'editing': False})
 
 
 @department_objective_write_required
@@ -1446,7 +1449,7 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
             messages.error(request, percentage_error.replace('na tarefa', 'no objetivo departamental'))
             return redirect('planejamento_objetivo_departamental_menu')
         percentage_error = validate_available_department_percentage(
-            objetivo.institutional_objective, percentagem, exclude_objective_id=objetivo.id,
+            objetivo.institutional_objective, percentagem, objetivo.department, exclude_objective_id=objetivo.id,
         )
         if percentage_error:
             messages.error(request, percentage_error)
@@ -1466,7 +1469,7 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
         if request.POST.get('next') == 'department_menu':
             return redirect('planejamento_objetivo_departamental_menu')
         return redirect('planejamento_ciclo_detail', cycle_id=objetivo.institutional_objective.cycle_id)
-    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'departamental', 'parent': objetivo.institutional_objective, 'available_percentage': available_department_percentage(objetivo.institutional_objective, exclude_objective_id=objetivo.id), 'editing': True})
+    return render(request, 'shared/planejamento_objetivo_form.html', {'cycle': objetivo.institutional_objective.cycle, 'objetivo': objetivo, 'kind': 'departamental', 'parent': objetivo.institutional_objective, 'available_percentage': available_department_percentage(objetivo.institutional_objective, objetivo.department, exclude_objective_id=objetivo.id), 'editing': True})
 
 
 @department_objective_write_required
