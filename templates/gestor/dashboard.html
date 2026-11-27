@@ -12,8 +12,11 @@
           <div class="manager-dashboard-actions"><a class="button primary" href="{% url 'planejamento_objetivo_departamental_menu' %}" data-spa-link>Objetivos departamentais <span>→</span></a><a class="button" href="{% url 'planejamento_objetivo_individual_menu' %}" data-spa-link>Objetivos individuais <span>→</span></a></div>
         </section>
 
-        <section class="manager-cycle-banner{% if not active_cycle %} manager-cycle-empty{% endif %}">
+        <section class="manager-cycle-banner{% if active_cycle %} manager-cycle-banner-with-report{% else %} manager-cycle-empty{% endif %}">
           <div><span class="eyebrow">{% if active_cycle %}CICLO EM ANDAMENTO{% else %}SITUAÇÃO ATUAL{% endif %}</span><h2>{% if active_cycle %}{{ active_cycle.name }} <span>{{ active_cycle.year }}</span>{% else %}Sem ciclo em andamento{% endif %}</h2><p>{% if active_cycle %}{{ active_cycle.start_date|date:'d/m/Y' }} a {{ active_cycle.end_date|date:'d/m/Y' }}{% else %}Os objetivos continuam disponíveis para consulta e organização.{% endif %}</p></div>
+          {% if active_cycle %}
+            <div class="dashboard-cycle-actions">{% include 'includes/cycle_report_button.html' %}</div>
+          {% endif %}
         </section>
 
         <section class="manager-stats">

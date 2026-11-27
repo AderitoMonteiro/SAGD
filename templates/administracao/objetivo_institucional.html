@@ -30,16 +30,16 @@
           <div class="objective-record-list">
             {% for objetivo in objetivos %}
             <article class="objective-record">
-              <div class="objective-record-state"><button class="objective-state-trigger" type="button"
+              <div class="objective-record-state">{% if not objetivo.edit_deadline_passed or not objetivo.is_open %}<button class="objective-state-trigger" type="button"
                   data-open-objective-modal="toggle-{{ objetivo.id }}"
-                  aria-label="Alterar estado do objetivo {{ objetivo.description }}">⋮</button>
+                  aria-label="Alterar estado do objetivo {{ objetivo.description }}">⋮</button>{% endif %}
                 <div class="objective-record-icon">◎</div>
               </div>
               <div class="objective-record-info"><strong>{{ objetivo.description }}</strong><span>Ciclo: {{ objetivo.cycle.name }} · {{ objetivo.cycle.year }}</span></div>
               <span class="objective-status objective-status-{{ objetivo.automatic_status }}">{{ objetivo.automatic_status_display }}</span>
               <div class="objective-record-actions"><button class="button" type="button"
-                  data-open-objective-modal="view-{{ objetivo.id }}">Ver</button>{% if objetivo.domain.type == 1 and not objetivo.cycle_locked or objetivo.domain.type == 1 and can_bypass_cycle_lock %}<button class="button" type="button"
-                  data-open-objective-modal="edit-{{ objetivo.id }}">Editar</button><button
+                  data-open-objective-modal="view-{{ objetivo.id }}">Ver</button>{% if objetivo.domain.type == 1 and not objetivo.cycle_locked or objetivo.domain.type == 1 and can_bypass_cycle_lock %}{% if not objetivo.edit_deadline_passed or can_bypass_cycle_lock %}<button class="button" type="button"
+                  data-open-objective-modal="edit-{{ objetivo.id }}">Editar</button>{% endif %}<button
                   class="button ca-delete-button" type="button"
                   data-open-objective-modal="delete-{{ objetivo.id }}">Eliminar</button>{% endif %}</div>
             </article>
@@ -96,9 +96,9 @@
           <div><small>ESTADO</small><strong>{{ objetivo.automatic_status_display }}</strong></div>
           <div><small>CRIADO EM</small><strong>{{ objetivo.date_created|date:'d/m/Y' }}</strong></div>
         </div>
-        <div class="form-actions"><button class="button" type="button" data-close-objective-modal>Fechar</button>{% if not objetivo.cycle_locked or can_bypass_cycle_lock %}<button
+        <div class="form-actions"><button class="button" type="button" data-close-objective-modal>Fechar</button>{% if not objetivo.edit_deadline_passed or can_bypass_cycle_lock %}{% if not objetivo.cycle_locked or can_bypass_cycle_lock %}<button
             class="button primary" type="button" data-switch-objective-modal="edit-{{ objetivo.id }}">Editar
-            objetivo</button>{% endif %}</div>
+            objetivo</button>{% endif %}{% endif %}</div>
       </section>
     </div>
     <div class="objective-modal" data-objective-modal="toggle-{{ objetivo.id }}" aria-hidden="true">

@@ -15,10 +15,10 @@
           <div class="objective-record-list">
             {% for objetivo in objetivos %}
             <article class="objective-record{% if is_manager_user and objetivo.has_admin_feedback %} objective-record-has-feedback{% endif %}">
-              <div class="objective-record-state">{% if objetivo.is_approved and not objetivo.cycle_locked or objetivo.is_approved and can_bypass_cycle_lock %}<button class="objective-state-trigger" type="button" data-open-department-modal="toggle-{{ objetivo.id }}" aria-label="Alterar estado do objetivo {{ objetivo.description }}">⋮</button>{% endif %}<div class="objective-record-icon objective-department-icon">◈</div></div>
+              <div class="objective-record-state">{% if objetivo.is_approved and not objetivo.cycle_locked or objetivo.is_approved and can_bypass_cycle_lock %}{% if not objetivo.edit_deadline_passed or not objetivo.is_open %}<button class="objective-state-trigger" type="button" data-open-department-modal="toggle-{{ objetivo.id }}" aria-label="Alterar estado do objetivo {{ objetivo.description }}">⋮</button>{% endif %}{% endif %}<div class="objective-record-icon objective-department-icon">◈</div></div>
               <div class="objective-record-info"><strong>{{ objetivo.description }}</strong><span>Institucional: {{ objetivo.institutional_objective.description|truncatechars:70 }}</span>{% if is_council_user %}<span>Departamento: {{ objetivo.department.name|default:'Não atribuído' }}</span>{% endif %}<span class="individual-percentage-highlight">Percentagem aplicada: <strong>{{ objetivo.percentagem|floatformat:2 }}%</strong></span><span>Ciclo: {{ objetivo.institutional_objective.cycle.name }} · {{ objetivo.institutional_objective.cycle.year }}</span></div>
               {% if is_manager_user and objetivo.has_admin_feedback %}<span class="department-feedback-indicator" title="Este objetivo possui feedback da Administração"><span aria-hidden="true">!</span> Feedback da Administração</span>{% endif %}<span class="objective-status objective-status-{{ objetivo.listing_status }}">{{ objetivo.listing_status_display }}</span>
-              <div class="objective-record-actions"><button class="button" type="button" data-open-department-modal="view-{{ objetivo.id }}">Ver</button>{% if objetivo.can_be_edited or can_bypass_cycle_lock %}<button class="button" type="button" data-open-department-modal="edit-{{ objetivo.id }}">Editar</button>{% endif %}{% if objetivo.domain.type == 1 and not objetivo.cycle_locked or objetivo.domain.type == 1 and can_bypass_cycle_lock %}<button class="button ca-delete-button" type="button" data-open-department-modal="delete-{{ objetivo.id }}">Eliminar</button>{% endif %}</div>
+              <div class="objective-record-actions"><button class="button" type="button" data-open-department-modal="view-{{ objetivo.id }}">Ver</button>{% if objetivo.can_be_edited or can_bypass_cycle_lock %}{% if not objetivo.edit_deadline_passed or can_bypass_cycle_lock %}<button class="button" type="button" data-open-department-modal="edit-{{ objetivo.id }}">Editar</button>{% endif %}{% endif %}{% if objetivo.domain.type == 1 and not objetivo.cycle_locked or objetivo.domain.type == 1 and can_bypass_cycle_lock %}<button class="button ca-delete-button" type="button" data-open-department-modal="delete-{{ objetivo.id }}">Eliminar</button>{% endif %}</div>
             </article>
             {% endfor %}
           </div>
@@ -47,7 +47,7 @@
             {% elif is_council_user and objetivo.approval_status == 'rejected' %}
               <button class="button department-approve-button" type="button" data-switch-department-modal="approve-{{ objetivo.id }}">Aprovar</button>
             {% elif not is_council_user and objetivo.can_be_edited %}
-              <button class="button primary" type="button" data-switch-department-modal="edit-{{ objetivo.id }}">Editar objetivo</button>
+              {% if not objetivo.edit_deadline_passed or can_bypass_cycle_lock %}<button class="button primary" type="button" data-switch-department-modal="edit-{{ objetivo.id }}">Editar objetivo</button>{% endif %}
             {% endif %}
           </div>
         </section>

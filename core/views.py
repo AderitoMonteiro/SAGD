@@ -1321,6 +1321,9 @@ def planejamento_objetivo_institucional_edit(request, objetivo_id):
     objetivo = get_object_or_404(InstitutionalObjective, pk=objetivo_id)
     if block_closed_cycle(request, objetivo.cycle):
         return redirect('planejamento_objetivo_institucional_menu')
+    if objetivo.edit_deadline_passed and not can_bypass_cycle_lock(request.user):
+        messages.error(request, 'A data limite foi ultrapassada. Este registo já não pode ser editado.')
+        return redirect('planejamento_objetivo_institucional_menu')
     if not objetivo.domain_id or objetivo.domain.type != 1:
         messages.error(request, 'Apenas objetivos abertos podem ser editados.')
         return redirect('planejamento_objetivo_institucional_menu')
@@ -1375,6 +1378,9 @@ def planejamento_objetivo_institucional_toggle_status(request, objetivo_id):
         return redirect('planejamento_objetivo_institucional_menu')
     target_type = int(target_type)
     current_type = 1 if objetivo.is_open else 2
+    if target_type == 2 and objetivo.edit_deadline_passed:
+        messages.error(request, 'A data limite foi ultrapassada. Este objetivo já não pode ser concluído.')
+        return redirect('planejamento_objetivo_institucional_menu')
     if target_type == current_type:
         messages.info(request, 'O objetivo já se encontra nesse estado.')
         return redirect('planejamento_objetivo_institucional_menu')
@@ -1430,6 +1436,9 @@ def planejamento_objetivo_departamental_edit(request, objetivo_id):
         pk=objetivo_id,
     )
     if block_closed_cycle(request, objetivo.institutional_objective.cycle):
+        return redirect('planejamento_objetivo_departamental_menu')
+    if objetivo.edit_deadline_passed and not can_bypass_cycle_lock(request.user):
+        messages.error(request, 'A data limite foi ultrapassada. Este registo já não pode ser editado.')
         return redirect('planejamento_objetivo_departamental_menu')
     if not objetivo.can_be_edited and not can_bypass_cycle_lock(request.user):
         messages.error(request, 'Apenas objetivos em andamento ou rejeitados podem ser editados.')
@@ -1513,6 +1522,9 @@ def planejamento_objetivo_departamental_toggle_status(request, objetivo_id):
     target_type = int(target_type)
     if target_type == 2 and not objetivo.is_approved:
         messages.error(request, 'O objetivo precisa ser aprovado antes de ser concluído.')
+        return redirect('planejamento_objetivo_departamental_menu')
+    if target_type == 2 and objetivo.edit_deadline_passed:
+        messages.error(request, 'A data limite foi ultrapassada. Este objetivo já não pode ser concluído.')
         return redirect('planejamento_objetivo_departamental_menu')
     current_type = 1 if objetivo.is_open else 2
     if target_type == current_type:
@@ -1808,6 +1820,9 @@ def planejamento_objetivo_individual_edit(request, objetivo_id):
     )
     if block_closed_cycle(request, objetivo.department_objective.institutional_objective.cycle):
         return redirect('planejamento_objetivo_individual_menu')
+    if objetivo.edit_deadline_passed and not can_bypass_cycle_lock(request.user):
+        messages.error(request, 'A data limite foi ultrapassada. Este registo já não pode ser editado.')
+        return redirect('planejamento_objetivo_individual_menu')
     if objetivo.automatic_status == 'completed' and not can_bypass_cycle_lock(request.user):
         messages.error(request, 'Uma tarefa individual concluída não pode ser editada.')
         return redirect('planejamento_objetivo_individual_menu')
@@ -1915,6 +1930,9 @@ def colaborador_tarefa_atualizar(request, objetivo_id):
         return redirect('menu_home')
 
     action = request.POST.get('action')
+    if action == 'complete' and task.edit_deadline_passed:
+        messages.error(request, 'A data limite foi ultrapassada. Esta tarefa já não pode ser concluída.')
+        return redirect('menu_home')
     if action == 'start' and task.status == 'draft':
         task.status = 'active'
         task.save(update_fields=['status', 'date_update'])
@@ -2067,6 +2085,8 @@ def gestor_tarefa_concluir(request, objetivo_id):
 
     if task.department_objective.institutional_objective.cycle.automatic_status == 'closed':
         messages.error(request, 'Não é possível concluir uma tarefa de um ciclo encerrado.')
+    elif task.edit_deadline_passed:
+        messages.error(request, 'A data limite foi ultrapassada. Esta tarefa já não pode ser concluída.')
     elif task.status == 'completed':
         messages.error(request, 'Esta tarefa já se encontra concluída.')
     else:

@@ -311,6 +311,11 @@ class InstitutionalObjective(ActiveRecord):
     def cycle_locked(self):
         return self.cycle.automatic_status == 'closed'
 
+    @property
+    def edit_deadline_passed(self):
+        today = timezone.localdate()
+        return self.cycle.end_date < today
+
 class Department(ActiveRecord):
     name = models.CharField('nome', max_length=120, unique=True)
     code = models.CharField('código', max_length=30, unique=True)
@@ -482,6 +487,11 @@ class DepartmentObjective(ActiveRecord):
         return self.institutional_objective.cycle.automatic_status == 'closed'
 
     @property
+    def edit_deadline_passed(self):
+        today = timezone.localdate()
+        return self.institutional_objective.cycle.end_date < today
+
+    @property
     def has_admin_feedback(self):
         return bool(self.approval_comments)
 
@@ -552,6 +562,11 @@ class IndividualObjective(ActiveRecord):
     @property
     def cycle_locked(self):
         return self.department_objective.institutional_objective.cycle.automatic_status == 'closed'
+
+    @property
+    def edit_deadline_passed(self):
+        today = timezone.localdate()
+        return self.department_objective.institutional_objective.cycle.end_date < today or (self.end_date is not None and self.end_date < today)
 
 
     @property

@@ -27,7 +27,7 @@
                 </div>
                 <div class="collaborator-task-action">
                   <span class="objective-status objective-status-{{ task.automatic_status }}">{{ task.automatic_status_display }}</span>
-                  {% if task.automatic_status != 'completed' %}<form method="post" action="{% url 'colaborador_tarefa_atualizar' task.id %}"{% if task.status != 'draft' %} data-confirm-task-completion{% endif %}>{% csrf_token %}{% if task.status == 'draft' %}<input type="hidden" name="action" value="start"><button class="button primary" type="submit">Iniciar tarefa</button>{% else %}<input type="hidden" name="action" value="complete"><button class="button collaborator-complete-button" type="submit">Concluir tarefa</button>{% endif %}</form>{% endif %}
+                  {% if task.automatic_status != 'completed' and not task.edit_deadline_passed or task.automatic_status != 'completed' and task.status == 'draft' %}<form method="post" action="{% url 'colaborador_tarefa_atualizar' task.id %}"{% if task.status != 'draft' %} data-confirm-task-completion{% endif %}>{% csrf_token %}{% if task.status == 'draft' %}<input type="hidden" name="action" value="start"><button class="button primary" type="submit">Iniciar tarefa</button>{% else %}<input type="hidden" name="action" value="complete"><button class="button collaborator-complete-button" type="submit">Concluir tarefa</button>{% endif %}</form>{% endif %}
                 </div>
                 {% with occurrences=task.occurrence_records.all %}<details class="task-occurrences">
                   <summary>Observações <strong>{{ occurrences|length }}</strong><span>Consultar histórico</span></summary>

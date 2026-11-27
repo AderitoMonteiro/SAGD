@@ -6,13 +6,13 @@
   flex-wrap: wrap;
 }
 
-.dashboard-cycle-banner .dashboard-report-placeholder {
+.dashboard-cycle-actions .dashboard-report-placeholder {
   background-color: #72d8bc;
   color: #0b315f;
   border: 1px solid #72d8bc;
 }
 
-.dashboard-cycle-banner .dashboard-report-placeholder:hover {
+.dashboard-cycle-actions .dashboard-report-placeholder:hover {
   background-color: #8be2ca;
   border-color: #8be2ca;
 }
@@ -34,7 +34,18 @@
   letter-spacing: .2px;
 }
 
+.manager-cycle-banner-with-report {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
 @media (max-width: 600px) {
+  .manager-cycle-banner-with-report {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .dashboard-cycle-actions {
     width: 100%;
     justify-content: flex-start;
